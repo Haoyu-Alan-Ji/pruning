@@ -1,0 +1,29 @@
+---
+title: "information on projects"
+bibliography: haoyu_projects.bib
+format:
+    html: 
+       embed-resources: true
+---
+
+My 'ideas' page (somewhat out of date) is [here](https://ms.mcmaster.ca/~bolker/ideas.html)
+
+# R-Julia interoperability for mixed models
+
+Doug Bates, Phillip Alday, and others have written the [MixedModels.jl package](https://juliastats.org/MixedModels.jl/stable/) in Julia to fit mixed models. It is considerably faster than `lme4` or `glmmTMB`, in part because Julia is fast and in part because Doug Bates has improved the algorithms. There a variety of tools developed 
+
+The ultimate goal is to be able to use `MixedModels.jl`, more or less seamlessly, from an R session.
+
+* [JellyMe4.jl](https://github.com/palday/JellyMe4.jl)
+* [jlme](https://github.com/palday/jlme)
+* [jglmm](https://github.com/mikabr/jglmm) (see also [https://rpubs.com/mikabr/jglmm-qsu](https://rpubs.com/mikabr/jglmm-qsu))
+	
+
+## RTMB implementation for correlated evolution
+
+@pagelDetecting1994; @eckertParentalCareDrives2025; @boykoGeneralizedHiddenMarkov2021
+
+* [a presentation on this work](https://math.mcmaster.ca/~bolker/misc/AG_csesem.html)
+* Felsenstein's *pruning algorithm* (https://en.wikipedia.org/wiki/Felsenstein%27s_tree-pruning_algorithm)
+	
+## References	
