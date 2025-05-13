@@ -7,11 +7,24 @@ format:
 date: today
 ---
 
-```{r}
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(here)
+setwd(here::here())
+```
+
+```{r pkgs, message = FALSE, warning=FALSE}
 library(Matrix)
 library(ape)
+library(tidyverse); theme_set(theme_bw())
+library(waldo)
+```
 
+```{r}
 set.seed(101)
+```
+
+```{r}
 m3 <- rtree(10)
 par(mfrow=c(2,2))
 head(m3$edge)
@@ -34,8 +47,15 @@ tiplabels()
 nodelabels()
 
 identical(m3, reorder(m3, "pruningwise"))
-library(waldo)
+
 compare(m3, reorder(m3, "pruningwise"))
+```
+
+```{r}
+#tip likelihood
+tree <- reorder(m3, "pruningwise")
+likelihood <- sum(root_prior * root_likelihood)
+
 ```
 
 ```{r}
@@ -66,23 +86,5 @@ str(tree)
 is.binary(tree)
 is.rooted(tree)
 is.ultrametric(tree)
-
-# 打印原始 edge 矩阵
-cat("\n原始 edge 矩阵:\n")
-print(tree$edge)
-
-# 打印 pruningwise 排序
-tree_p <- reorder(tree, "pruningwise")
-cat("\npruningwise 排序:\n")
-print(tree_p$edge)
-
-# 打印 postorder 排序
-tree_post <- reorder(tree, "postorder")
-cat("\npostorder 排序:\n")
-print(tree_post$edge)
-
-# 比较 postorder 逆序
-cat("\npostorder 逆序:\n")
-print(tree_post$edge[nrow(tree_post$edge):1, ])
 ```
 
