@@ -1,0 +1,88 @@
+---
+title: "My document"
+author: "Haoyu Ji-jih20"
+format: 
+  html:
+    self-contained: true
+date: today
+---
+
+```{r}
+library(Matrix)
+library(ape)
+
+set.seed(101)
+m3 <- rtree(10)
+par(mfrow=c(2,2))
+head(m3$edge)
+head(reorder(m3, "pruningwise")$edge)
+head(reorder(m3, "postorder")$edge)
+
+## is postorder == pruningwise in reverse??
+head(reorder(m3, "postorder")$edge[18:1,])
+
+## why do these all look identical??
+plot(m3)
+plot(reorder(m3, "pruningwise"))
+tiplabels()
+nodelabels()
+plot(reorder(m3, "cladewise"))
+tiplabels()
+nodelabels()
+plot(reorder(m3, "postorder"))
+tiplabels()
+nodelabels()
+
+identical(m3, reorder(m3, "pruningwise"))
+library(waldo)
+compare(m3, reorder(m3, "pruningwise"))
+```
+
+```{r}
+edge1 <- matrix(c(
+  5, 3,
+  3, 1,
+  3, 2,
+  5, 4
+), byrow = TRUE, ncol = 2)
+
+tip.label <- c("t1", "t2", "t3")
+
+edge.length <- rep(1, nrow(edge1))
+
+Nnode <- 2
+
+tree <- list(edge = edge1,
+             tip.label = tip.label,
+             edge.length = edge.length,
+             Nnode = Nnode)
+class(tree) <- "phylo"
+
+plot(tree, type = "phylogram", show.node.label = TRUE,  edge.width = 2, cex = 0.8)
+tiplabels()
+nodelabels()
+
+str(tree)
+is.binary(tree)
+is.rooted(tree)
+is.ultrametric(tree)
+
+# 打印原始 edge 矩阵
+cat("\n原始 edge 矩阵:\n")
+print(tree$edge)
+
+# 打印 pruningwise 排序
+tree_p <- reorder(tree, "pruningwise")
+cat("\npruningwise 排序:\n")
+print(tree_p$edge)
+
+# 打印 postorder 排序
+tree_post <- reorder(tree, "postorder")
+cat("\npostorder 排序:\n")
+print(tree_post$edge)
+
+# 比较 postorder 逆序
+cat("\npostorder 逆序:\n")
+print(tree_post$edge[nrow(tree_post$edge):1, ])
+```
+
