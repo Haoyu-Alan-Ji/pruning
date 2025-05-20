@@ -27,7 +27,7 @@ tree$edge <- matrix(c(
   4, 2,
   4, 3),
   byrow = TRUE, ncol = 2)
-plot(tree)  ## core dump!
+## plot(tree)  ## core dump!
 
 str(tree)
 is.binary(tree)
