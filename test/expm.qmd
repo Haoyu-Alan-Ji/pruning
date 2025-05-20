@@ -20,6 +20,8 @@ library(tidyverse); theme_set(theme_bw())
 library(waldo)
 library(expm)
 library(RTMB)
+library(numDeriv) ## for testing gradients
+library(microbenchmark)
 ```
 
 ```{r seed}
@@ -183,7 +185,7 @@ for (i in anc) {
   }
   comp[i] <- sum(v)
   liks[i, ] <- v / comp[i]
-  cat(i, liks[i,], "\n")
+  ## cat(i, liks[i,], "\n")
 }
 
 #loglik
@@ -199,6 +201,7 @@ print(neg_loglik)
 ## with RTMB
 
 ```{r}
+debug <- FALSE
 fn <- function(pars) {
   ## allow sub-assignment, i.e. assignment to a particular row of a matrix
   ## https://groups.google.com/g/tmb-users/c/HlPqkfcCa1g
@@ -211,7 +214,7 @@ fn <- function(pars) {
   non_diag <- (row(Q) != col(Q))
   Q[non_diag] <- trans_rates ## fill in off-diagonals
   diag(Q) <- -1*rowSums(Q)
-  print(Q)
+  if (debug) { cat("Q:\n"); print(Q) }
   p1 <- reorder(p1, "pruningwise")
   comp <- numeric(nrow(liks))
   anc <- unique(p1$edge[, 1])
@@ -227,7 +230,8 @@ fn <- function(pars) {
     }
     comp[i] <- sum(v)
     liks[i, ] <- v / comp[i]
-    cat(i, liks[i,], "\n")
+    ## n.b. these numbers won't make sense in AD mode!
+    if (debug) cat(i, liks[i,], "\n")
   }
   TIPS <- 1:Ntip(p1)
   root <- Ntip(p1) + 1
@@ -239,7 +243,26 @@ fn <- function(pars) {
 pars0 <- list(trans_rates = c(0.5, 1.2))
 fn(pars0)
 
-ff <- MakeADFun(fn, pars0)
+## numDeriv::grad() wants a function that takes a numeric vector
+## (rather than a list) as its argument ...
+fngradwrap <- function(p) {
+  fn(list(trans_rates = p))
+}
+numDeriv::grad(fngradwrap, pars0$trans_rates)
+
+ff <- MakeADFun(fn, pars0, silent = TRUE)
 ff$fn()
 ff$gr()
+```
+
+```{r}
+mb1 <- microbenchmark(
+  AD = ff$gr(),
+  finite_diff = numDeriv::grad(fngradwrap, pars0$trans_rates)
+)
+set.seed(101)
+mb1_rand <- microbenchmark(
+  AD = ff$gr(abs(rnorm(2))),
+  finite_diff = numDeriv::grad(fngradwrap, abs(rnorm(2)))
+)
 ```
