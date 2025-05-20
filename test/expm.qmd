@@ -19,13 +19,14 @@ library(ape)
 library(tidyverse); theme_set(theme_bw())
 library(waldo)
 library(expm)
+library(RTMB)
 ```
 
 ```{r seed}
 set.seed(427)
 ```
 
-```{r order compare}
+```{r order-compare}
 m3 <- rtree(10)
 par(mfrow=c(2,2))
 head(m3$edge)
@@ -83,7 +84,7 @@ is.rooted(tree)
 is.ultrametric(tree)
 ```
 
-```{r}
+```{r simple-tree}
 # 3 tips tree
 tree <- read.tree(text = "((t1:0.1,t2:0.2):0.3,t3:0.5);")
 plot(tree, show.node.label = TRUE)
@@ -100,7 +101,7 @@ liks[1, ] <- c(1, 0)  # t1
 liks[2, ] <- c(0, 1)  # t2
 liks[3, ] <- c(1, 0)  # t3
 
-# calculate by pruninwise order
+# calculate by pruningwise order
 tree <- reorder(tree, "pruningwise")
 comp <- numeric(nrow(liks))
 anc <- unique(tree$edge[, 1])
@@ -133,7 +134,7 @@ $$
 \log L = \sum_{\text{internal}} \log(\text{comp}) + \log\left( \sum_k \pi_k \cdot L_{\text{root},k} \right)
 $$
 
-```{r}
+```{r primate-tree1}
 load("../data/primates.rda")
 p1 <- primate.tree1
 plot(reorder(p1, "pruningwise"))
@@ -146,23 +147,26 @@ q10 <- 0.5
 Q <- matrix(c(-1.2, 1.2,
               0.5, -0.5), nrow = 2, byrow = TRUE)
 
-
 liks <- matrix(NA, nrow = Ntip(p1) + p1$Nnode, ncol = 2)
-liks[1, ] <- c(1, 0)
-liks[2, ] <- c(0, 1)
-liks[3, ] <- c(1, 0)
-liks[4, ] <- c(1, 0)
-liks[5, ] <- c(0, 1)
-liks[6, ] <- c(1, 0)
-liks[7, ] <- c(1, 0)
-liks[8, ] <- c(0, 1)
-# liks[9, ] <- c(1, 0)
-# liks[10, ] <- c(1, 0)
-# liks[11, ] <- c(0, 1)
-# liks[12, ] <- c(1, 0)
-# liks[13, ] <- c(1, 0)
-# liks[14, ] <- c(0, 1)
-# liks[15, ] <- c(1, 0)
+
+## using primate.discrete2, but only trait2 (ignore trait1 for now,
+## later we can expand the state space to include both traits (i.e. 4 possibilities)
+ntips <- nrow(primate.discrete2)
+
+## ## understandable but longer
+## for (i in 1:ntips) {
+##   if (trait2 == 0) {
+##     liks[i,] <- c(1,0)
+##   } else {
+##     liks[i,] <- c(0,1)
+##   }
+## }
+## or, being fancier:
+
+## set all tip likelihoods to 0
+liks[1:ntips,] <- 0
+inds <- cbind(1:ntips, primate.discrete2[,"trait2"]+1)
+liks[inds] <- 1
 
 # calculate by pruninwise order
 p1 <- reorder(p1, "pruningwise")
@@ -179,6 +183,7 @@ for (i in anc) {
   }
   comp[i] <- sum(v)
   liks[i, ] <- v / comp[i]
+  cat(i, liks[i,], "\n")
 }
 
 #loglik
@@ -188,6 +193,53 @@ root.p <- rep(0.5, 2)
 loglik <- sum(log(comp[-TIPS])) + log(sum(root.p * liks[root, ]))
 
 neg_loglik <- -loglik
-
+print(neg_loglik)
 ```
 
+## with RTMB
+
+```{r}
+fn <- function(pars) {
+  ## allow sub-assignment, i.e. assignment to a particular row of a matrix
+  ## https://groups.google.com/g/tmb-users/c/HlPqkfcCa1g
+  "[<-" <- ADoverload("[<-")
+  getAll(pars)
+  ## right now, now constraints on the transition matrix (i.e
+  ## all elements can be non-zero)
+  ## pars <- c(1.2, 0.5)
+  Q <- matrix(0, 2, 2)
+  non_diag <- (row(Q) != col(Q))
+  Q[non_diag] <- trans_rates ## fill in off-diagonals
+  diag(Q) <- -1*rowSums(Q)
+  print(Q)
+  p1 <- reorder(p1, "pruningwise")
+  comp <- numeric(nrow(liks))
+  anc <- unique(p1$edge[, 1])
+  for (i in anc) {
+    desRows <- which(p1$edge[, 1] == i)
+    desNodes <- p1$edge[desRows, 2]
+    v <- 1
+    for (d in seq_along(desRows)) {
+      t <- p1$edge.length[desRows[d]]
+      ## need Matrix::expm , then drop() to convert back to a vector
+      P <- Matrix::expm(Q * t)
+      v <- drop(v * (P %*% liks[desNodes[d], ]))
+    }
+    comp[i] <- sum(v)
+    liks[i, ] <- v / comp[i]
+    cat(i, liks[i,], "\n")
+  }
+  TIPS <- 1:Ntip(p1)
+  root <- Ntip(p1) + 1
+  root.p <- rep(0.5, 2)
+  neg_loglik <- -1*(sum(log(comp[-TIPS])) + log(sum(root.p * liks[root, ])))
+  return(neg_loglik)
+}
+
+pars0 <- list(trans_rates = c(0.5, 1.2))
+fn(pars0)
+
+ff <- MakeADFun(fn, pars0)
+ff$fn()
+ff$gr()
+```
