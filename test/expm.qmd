@@ -266,3 +266,35 @@ mb1_rand <- microbenchmark(
   finite_diff = numDeriv::grad(fngradwrap, abs(rnorm(2)))
 )
 ```
+
+## bigger transition matrices
+
+```{r}
+
+## put indices in corresponding to allowed transitions
+states <- c("(0,0)", "(0,1)", "(1,0)", "(1,1)")
+Q_template <- matrix(0, 4, 4,
+                     dimnames = list(states, states))
+allowed <- matrix(c(2,1,
+                    3,1,
+                    1,2,
+                    4,2,
+                    1,3,
+                    4,3,
+                    3,4,
+                    2,4),
+                  ncol = 2,
+                  byrow = TRUE)
+Q_template[allowed] <- 1:8
+image(Matrix(Q_template))
+
+trans_rate <- abs(rnorm(8))
+Q_cur <- Q_template
+
+## start likelihood calculation here ...
+Q_cur[Q_cur!=0] <- trans_rate  ## fill in transition rate values
+diag(Q_cur) <- -rowSums(Q_cur) ## set diagonal
+## ... now compute the log-likelihood using this Q ...
+image(Matrix(Q_cur))
+```
+
