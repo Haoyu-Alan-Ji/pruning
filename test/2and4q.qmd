@@ -28,114 +28,6 @@ library(microbenchmark)
 set.seed(427)
 ```
 
-```{r order-compare}
-m3 <- rtree(10)
-par(mfrow=c(2,2))
-head(m3$edge)
-head(reorder(m3, "pruningwise")$edge)
-head(reorder(m3, "postorder")$edge)
-
-## is postorder == pruningwise in reverse??
-head(reorder(m3, "postorder")$edge[18:1,])
-
-## why do these all look identical??
-plot(m3)
-plot(reorder(m3, "pruningwise"))
-tiplabels()
-nodelabels()
-plot(reorder(m3, "cladewise"))
-tiplabels()
-nodelabels()
-plot(reorder(m3, "postorder"))
-tiplabels()
-nodelabels()
-
-identical(m3, reorder(m3, "pruningwise"))
-
-compare(m3, reorder(m3, "pruningwise"))
-```
-
-
-```{r fail test, eval = FALSE}
-edge1 <- matrix(c(
-  5, 3,
-  3, 1,
-  3, 2,
-  5, 4
-), byrow = TRUE, ncol = 2)
-
-tip.label <- c("t1", "t2", "t3")
-
-edge.length <- rep(1, nrow(edge1))
-
-Nnode <- 2
-
-tree <- list(edge = edge1,
-             tip.label = tip.label,
-             edge.length = edge.length,
-             Nnode = Nnode)
-class(tree) <- "phylo"
-
-plot(tree, type = "phylogram", show.node.label = TRUE,  edge.width = 2, cex = 0.8)
-tiplabels()
-nodelabels()
-
-str(tree)
-is.binary(tree)
-is.rooted(tree)
-is.ultrametric(tree)
-```
-
-```{r simple-tree}
-# 3 tips tree
-tree <- read.tree(text = "((t1:0.1,t2:0.2):0.3,t3:0.5);")
-plot(tree, show.node.label = TRUE)
-
-# 2*2 q
-q01 <- 1.2
-q10 <- 0.5
-Q <- matrix(c(-1.2, 1.2,
-              0.5, -0.5), nrow = 2, byrow = TRUE)
-
-# set t1 = state 0, t2 = state 1, t3 = state 0
-liks <- matrix(0, nrow = Ntip(tree) + tree$Nnode, ncol = 2)
-liks[1, ] <- c(1, 0)  # t1
-liks[2, ] <- c(0, 1)  # t2
-liks[3, ] <- c(1, 0)  # t3
-
-# calculate by pruningwise order
-tree <- reorder(tree, "pruningwise")
-comp <- numeric(nrow(liks))
-anc <- unique(tree$edge[, 1])
-for (focal in anc) {
-  desRows <- which(tree$edge[, 1] == focal)
-  desNodes <- tree$edge[desRows, 2]
-  v <- 1
-  for (d in seq_along(desRows)) {
-    t <- tree$edge.length[desRows[d]]
-    P <- expm(Q * t)
-    v <- v * (P %*% liks[desNodes[d], ])
-  }
-  comp[focal] <- sum(v)
-  liks[focal, ] <- v / comp[focal]
-}
-
-#loglik
-TIPS <- 1:Ntip(tree)
-root <- Ntip(tree) + 1
-root.p <- rep(0.5, 2)
-loglik <- sum(log(comp[-TIPS])) + log(sum(root.p * liks[root, ]))
-
-neg_loglik <- -loglik
-cat("Log-likelihood:", loglik, "\n")
-cat("Negative log-likelihood:", neg_loglik, "\n")
-
-```
-
-$$
-\log L = \sum_{\text{internal}} \log(\text{comp}) + \log\left( \sum_k \pi_k \cdot L_{\text{root},k} \right)
-$$
-
 ```{r primate-tree1}
 load("../data/primates.rda")
 p1 <- primate.tree1
@@ -151,25 +43,12 @@ Q <- matrix(c(-1.2, 1.2,
 
 liks <- matrix(NA, nrow = Ntip(p1) + p1$Nnode, ncol = 2)
 
-## using primate.discrete2, but only trait2 (ignore trait1 for now,
-## later we can expand the state space to include both traits (i.e. 4 possibilities)
 ntips <- nrow(primate.discrete2)
-
-## ## understandable but longer
-## for (i in 1:ntips) {
-##   if (trait2 == 0) {
-##     liks[i,] <- c(1,0)
-##   } else {
-##     liks[i,] <- c(0,1)
-##   }
-## }
-## or, being fancier:
-
-## set all tip likelihoods to 0
 liks[1:ntips,] <- 0
 inds <- cbind(1:ntips, primate.discrete2[,"trait2"]+1)
-liks[inds] <- 1
+liks[inds] <- 1 #第二排性状为1的是trait2=1
 
+# calculate by pruninwise order
 p1 <- reorder(p1, "pruningwise")
 comp <- numeric(nrow(liks))
 anc <- unique(p1$edge[, 1])
@@ -199,15 +78,13 @@ print(neg_loglik)
 
 ## with RTMB
 
-```{r}
-debug <- FALSE
+```{r 2*2 RTMB}
 fn <- function(pars) {
   ## allow sub-assignment, i.e. assignment to a particular row of a matrix
   ## https://groups.google.com/g/tmb-users/c/HlPqkfcCa1g
   "[<-" <- ADoverload("[<-")
   "c" <- ADoverload("c")
   "diag<-" <- ADoverload("diag<-")
-
   getAll(pars)
   ## right now, now constraints on the transition matrix (i.e
   ## all elements can be non-zero)
@@ -216,7 +93,13 @@ fn <- function(pars) {
   non_diag <- (row(Q) != col(Q))
   Q[non_diag] <- trans_rates ## fill in off-diagonals
   diag(Q) <- -1*rowSums(Q)
-  if (debug) { cat("Q:\n"); print(Q) }
+  
+  liks <- matrix(NA, nrow = Ntip(p1) + p1$Nnode, ncol = 2)
+  ntips <- nrow(primate.discrete2)
+  liks[1:ntips,] <- 0
+  inds <- cbind(1:ntips, primate.discrete2[,"trait2"]+1)
+  liks[inds] <- 1
+  
   p1 <- reorder(p1, "pruningwise")
   comp <- numeric(nrow(liks))
   anc <- unique(p1$edge[, 1])
@@ -245,6 +128,19 @@ fn <- function(pars) {
 pars0 <- list(trans_rates = c(0.5, 1.2))
 fn(pars0)
 
+ff <- MakeADFun(fn, pars0, silent = TRUE)
+ff$fn()
+ff$gr()
+```
+
+```{r}
+opt <- optim(ff$par, ff$fn, ff$gr, method = "BFGS")
+opt$par 
+ff$fn(opt$par)
+```
+
+
+```{r compare}
 ## numDeriv::grad() wants a function that takes a numeric vector
 ## (rather than a list) as its argument ...
 fngradwrap <- function(p) {
@@ -252,12 +148,6 @@ fngradwrap <- function(p) {
 }
 numDeriv::grad(fngradwrap, pars0$trans_rates)
 
-ff <- MakeADFun(fn, pars0, silent = TRUE)
-ff$fn()
-ff$gr()
-```
-
-```{r}
 mb1 <- microbenchmark(
   AD = ff$gr(),
   finite_diff = numDeriv::grad(fngradwrap, pars0$trans_rates)
@@ -299,4 +189,3 @@ diag(Q_cur) <- -rowSums(Q_cur) ## set diagonal
 ## ... now compute the log-likelihood using this Q ...
 image(Matrix(Q_cur))
 ```
-
