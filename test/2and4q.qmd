@@ -79,84 +79,89 @@ print(neg_loglik)
 ## with RTMB
 
 ```{r 2*2 RTMB}
-fn <- function(pars) {
-  ## allow sub-assignment, i.e. assignment to a particular row of a matrix
-  ## https://groups.google.com/g/tmb-users/c/HlPqkfcCa1g
-  "[<-" <- ADoverload("[<-")
-  "c" <- ADoverload("c")
-  "diag<-" <- ADoverload("diag<-")
-  getAll(pars)
-  ## right now, now constraints on the transition matrix (i.e
-  ## all elements can be non-zero)
-  ## pars <- c(1.2, 0.5)
-  Q <- matrix(0, 2, 2)
-  non_diag <- (row(Q) != col(Q))
-  Q[non_diag] <- trans_rates ## fill in off-diagonals
-  diag(Q) <- -1*rowSums(Q)
-  
-  liks <- matrix(NA, nrow = Ntip(p1) + p1$Nnode, ncol = 2)
-  ntips <- nrow(primate.discrete2)
-  liks[1:ntips,] <- 0
-  inds <- cbind(1:ntips, primate.discrete2[,"trait2"]+1)
-  liks[inds] <- 1
-  
-  p1 <- reorder(p1, "pruningwise")
-  comp <- numeric(nrow(liks))
-  anc <- unique(p1$edge[, 1])
-  for (i in anc) {
-    desRows <- which(p1$edge[, 1] == i)
-    desNodes <- p1$edge[desRows, 2]
-    v <- 1
-    for (d in seq_along(desRows)) {
-      t <- p1$edge.length[desRows[d]]
-      ## need Matrix::expm , then drop() to convert back to a vector
-      P <- Matrix::expm(Q * t)
-      v <- drop(v * (P %*% liks[desNodes[d], ]))
+q22 <- function(pars) {
+  fn <- function(pars) {
+    ## allow sub-assignment, i.e. assignment to a particular row of a matrix
+    ## https://groups.google.com/g/tmb-users/c/HlPqkfcCa1g
+    "[<-" <- ADoverload("[<-")
+    "c" <- ADoverload("c")
+    "diag<-" <- ADoverload("diag<-")
+    getAll(pars)
+    ## right now, now constraints on the transition matrix (i.e
+    ## all elements can be non-zero)
+    ## pars <- c(1.2, 0.5)
+    Q <- matrix(0, 2, 2)
+    non_diag <- (row(Q) != col(Q))
+    Q[non_diag] <- trans_rates ## fill in off-diagonals
+    diag(Q) <- -1*rowSums(Q)
+    
+    liks <- matrix(NA, nrow = Ntip(p1) + p1$Nnode, ncol = 2)
+    ntips <- nrow(primate.discrete2)
+    liks[1:ntips,] <- 0
+    inds <- cbind(1:ntips, primate.discrete2[,"trait2"]+1)
+    liks[inds] <- 1
+    
+    p1 <- reorder(p1, "pruningwise")
+    comp <- numeric(nrow(liks))
+    anc <- unique(p1$edge[, 1])
+    for (i in anc) {
+      desRows <- which(p1$edge[, 1] == i)
+      desNodes <- p1$edge[desRows, 2]
+      v <- 1
+      for (d in seq_along(desRows)) {
+        t <- p1$edge.length[desRows[d]]
+        ## need Matrix::expm , then drop() to convert back to a vector
+        P <- Matrix::expm(Q * t)
+        v <- drop(v * (P %*% liks[desNodes[d], ]))
+      }
+      comp[i] <- sum(v)
+      liks[i, ] <- v / comp[i]
+      ## n.b. these numbers won't make sense in AD mode!
     }
-    comp[i] <- sum(v)
-    liks[i, ] <- v / comp[i]
-    ## n.b. these numbers won't make sense in AD mode!
-    if (debug) cat(i, liks[i,], "\n")
+    TIPS <- 1:Ntip(p1)
+    root <- Ntip(p1) + 1
+    root.p <- rep(0.5, 2)
+    neg_loglik <- -1*(sum(log(comp[-TIPS])) + log(sum(root.p * liks[root, ])))
+    return(neg_loglik)
   }
-  TIPS <- 1:Ntip(p1)
-  root <- Ntip(p1) + 1
-  root.p <- rep(0.5, 2)
-  neg_loglik <- -1*(sum(log(comp[-TIPS])) + log(sum(root.p * liks[root, ])))
-  return(neg_loglik)
+  
+  ff <- MakeADFun(fn, pars, silent = TRUE)
+  ff1 <- optim(ff$par, ff$fn, ff$gr, method = "BFGS")
+  
+  fngradwrap <- function(p) {
+    fn(list(trans_rates = p))
+  }
+  finite_diff = numDeriv::grad(fngradwrap, pars0$trans_rates)
+  AD = pp2$ff$gr()
+  
+  mb1 <- microbenchmark(
+    AD = pp2$ff$gr(),
+    finite_diff = numDeriv::grad(fngradwrap, pars0$trans_rates)
+  )
+
+  result <- list(
+  opt_ff = ff1,
+  ff = ff,
+  loglik = ff1$value,
+  par_hat = ff1$par,
+  AD = AD,
+  finite_diff = finite_diff,
+  mb1 = mb1
+  )
+  
+  cat('loglik:\n'); print(ff$fn(ff1$par))
+  cat('parameters:\n'); print(ff1$par)
+  
+  return(result)
 }
 
 pars0 <- list(trans_rates = c(0.5, 1.2))
-fn(pars0)
+pp2 <- q22(pars0)
 
-ff <- MakeADFun(fn, pars0, silent = TRUE)
-ff$fn()
-ff$gr()
-```
-
-```{r}
-opt <- optim(ff$par, ff$fn, ff$gr, method = "BFGS")
-opt$par 
-ff$fn(opt$par)
-```
-
-
-```{r compare}
-## numDeriv::grad() wants a function that takes a numeric vector
-## (rather than a list) as its argument ...
-fngradwrap <- function(p) {
-  fn(list(trans_rates = p))
-}
-numDeriv::grad(fngradwrap, pars0$trans_rates)
-
-mb1 <- microbenchmark(
-  AD = ff$gr(),
-  finite_diff = numDeriv::grad(fngradwrap, pars0$trans_rates)
-)
-set.seed(101)
-mb1_rand <- microbenchmark(
-  AD = ff$gr(abs(rnorm(2))),
-  finite_diff = numDeriv::grad(fngradwrap, abs(rnorm(2)))
-)
+#is this three the info we want? seems like very small diff
+pp2$mb1
+pp2$AD
+pp2$finite_diff
 ```
 
 ## bigger transition matrices
