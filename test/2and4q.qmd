@@ -144,12 +144,12 @@ diag(Q) <- -1*rowSums(Q)
 Q_template <- matrix(0, dim, dim)
 non_diag <- (row(Q) != col(Q))
 nrates <- sum(non_diag)
-Q_template[non_diag] <- seq(sum(non_diag))
+Q_template[non_diag] <- seq(nrates)
 
 traits <- with(as.data.frame(primate.discrete2), trait2)
 TMBdata <- tibble::lst(Q_template, tree = p1, d = 2, trait_values = traits)
 
-pars <- list(trans_rates=rep(1,
+pars <- list(trans_rates=rep(1,nrates))
 prune_nll(pars)
 
 ff <- RTMB::MakeADFun(func = prune_nll, parameters = list(trans_rates = trans_rates), silent = TRUE)
