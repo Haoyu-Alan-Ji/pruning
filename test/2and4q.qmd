@@ -29,7 +29,7 @@ set.seed(427)
 ```
 
 ```{r primate-tree1}
-load("../data/primates.rda")
+L <- load("../data/primates.rda")
 p1 <- reorder(primate.tree1, "pruningwise")
 plot(p1)
 tiplabels()
@@ -55,11 +55,11 @@ allowed <- matrix(c(2,1,
 Q_template4[allowed] <- 1:8
 image(Matrix(Q_template4))
 
-trans_rates <- abs(rnorm(8))
+log_trans_rates <- log(abs(rnorm(8)))
 Q_cur <- Q_template4
 
 ## start likelihood calculation here ...
-Q_cur[Q_cur!=0] <- trans_rates  ## fill in transition rate values
+Q_cur[Q_cur!=0] <- exp(log_trans_rates)  ## fill in transition rate values
 diag(Q_cur) <- -rowSums(Q_cur) ## set diagonal
 ## ... now compute the log-likelihood using this Q ...
 image(Matrix(Q_cur))
@@ -89,6 +89,13 @@ rate.mat <- matrix(c(NA, 1, NA, 2, NA, 3, NA, 3, NA), 3, 3)
 # }
 #d*(d-1)/2 == n solve
 
+setup_Q <- function(trans_rates, Q_template) {
+  Q <- Q_template
+  Q[Q!=0] <- trans_rates[Q[Q!=0]] ## fill in trans rate elements
+  diag(Q) <- -1*rowSums(Q)
+  return(Q)
+}
+
 prune_nll <- function(pars) {
   ## allow sub-assignment, i.e. assignment to a particular row of a matrix
   ## https://groups.google.com/g/tmb-users/c/HlPqkfcCa1g
@@ -96,9 +103,7 @@ prune_nll <- function(pars) {
   "c" <- ADoverload("c")
   "diag<-" <- ADoverload("diag<-")
   getAll(pars, TMBdata)
-  Q <- Q_template
-  Q[Q!=0] <- trans_rates[Q[Q!=0]] ## fill in trans rate elements
-  diag(Q) <- -1*rowSums(Q)
+  Q <- setup_Q(exp(log_trans_rates), Q_template)
   liks <- matrix(NA, nrow = Ntip(tree) + tree$Nnode, ncol = d)
   ntips <- length(trait_values)
   liks[1:ntips,] <- 0
@@ -128,17 +133,19 @@ prune_nll <- function(pars) {
   neg_loglik <- -1*(sum(log(comp[-TIPS])) + log(sum(root.p * liks[root, ])))
   return(neg_loglik)
 }
+
+
 ```
 
 ```{r test-prune-nll}
 ## test
-pars <- list(trans_rates=c(1.2, 0.5))
-n <- length(pars$trans_rates)
+pars <- list(log_trans_rates=log(c(1.2, 0.5)))
+n <- length(pars$log_trans_rates)
 factors <- which(n %% 1:n == 0)
 dim <- factors[length(factors)/2 + 1]
 Q <- matrix(0, dim, dim)
 non_diag <- (row(Q) != col(Q))
-Q[non_diag] <- pars$trans_rates ## fill in off-diagonals
+Q[non_diag] <- pars$log_trans_rates ## fill in off-diagonals
 diag(Q) <- -1*rowSums(Q)
 
 Q_template <- matrix(0, dim, dim)
@@ -149,11 +156,11 @@ Q_template[non_diag] <- seq(nrates)
 traits <- with(as.data.frame(primate.discrete2), trait2+1)
 TMBdata <- tibble::lst(Q_template, tree = p1, d = 2, trait_values = traits)
 
-pars <- list(trans_rates=c(0.25, 0.75))
+pars <- list(log_trans_rates=log(c(0.25, 0.75)))
 prune_nll(pars)
 
 ff <- RTMB::MakeADFun(func = prune_nll,
-                      parameters = list(trans_rates = trans_rates), silent = TRUE)
+                      parameters = list(log_trans_rates = log_trans_rates), silent = TRUE)
 
 ## BMB: Kristensen et al claim nlminb works better for the problems they tried
 fit_2by2 <- nlminb(ff$par, ff$fn, ff$gr)
@@ -169,11 +176,8 @@ fit_2by2 <- nlminb(ff$par, ff$fn, ff$gr)
 traits <- with(as.data.frame(primate.discrete2), 1 + (trait1*2 + trait2))
 TMBdata <- tibble::lst(Q_template = Q_template4,
                        tree = p1, d = 4, trait_values = traits)
-
-pars <- list(trans_rates = traits)
-prune_nll(pars)
 ff4 <- RTMB::MakeADFun(func = prune_nll,
-                      parameters = list(trans_rates = trans_rates), silent = TRUE)
+                      parameters = list(log_trans_rates = log_trans_rates), silent = TRUE)
 
 fit_4by4 <- suppressWarnings(
   with(ff4, nlminb(par, fn, gr))
@@ -187,12 +191,24 @@ with(ff4$env, ff4$fn(last.par.best))
 with(ff4$env, ff4$gr(last.par.best))
 ```
 
+What does the transition matrix look like?
+
+```{r}
+Q_fit <- setup_Q(exp(fit_4by4$par), Q_template4)
+Matrix(expm(Q_fit))
+```
+
 ## bigger transition matrices
 
 ```{r corHMM-test}
 library(corHMM)
 data(primates)
 head(primates)
-with(primates, corHMM(tree, trait, rate.cat = 1))
+corHMM_fit0 <- corHMM(p1, primate.discrete2, rate.cat = 1)
+## try fitting this data set in prune_nll??
+## what are the differences in procedure between corHMM and our stuff?
+##   priors on root?
+##   other regularization etc.?
+corHMM_fit <- with(primates, corHMM(tree, trait, rate.cat = 1))
 ```
 
