@@ -30,8 +30,8 @@ set.seed(427)
 
 ```{r primate-tree1}
 load("../data/primates.rda")
-p1 <- primate.tree1
-plot(reorder(p1, "pruningwise"))
+p1 <- reorder(primate.tree1, "pruningwise")
+plot(p1)
 tiplabels()
 nodelabels()
 ```
@@ -40,7 +40,7 @@ nodelabels()
 ```{r qtemp}
 ## put indices in corresponding to allowed transitions
 states <- c("(0,0)", "(0,1)", "(1,0)", "(1,1)")
-Q_template <- matrix(0, 4, 4,
+Q_template4 <- matrix(0, 4, 4,
                      dimnames = list(states, states))
 allowed <- matrix(c(2,1,
                     3,1,
@@ -52,11 +52,11 @@ allowed <- matrix(c(2,1,
                     2,4),
                   ncol = 2,
                   byrow = TRUE)
-Q_template[allowed] <- 1:8
-image(Matrix(Q_template))
+Q_template4[allowed] <- 1:8
+image(Matrix(Q_template4))
 
 trans_rates <- abs(rnorm(8))
-Q_cur <- Q_template
+Q_cur <- Q_template4
 
 ## start likelihood calculation here ...
 Q_cur[Q_cur!=0] <- trans_rates  ## fill in transition rate values
@@ -146,16 +146,17 @@ non_diag <- (row(Q) != col(Q))
 nrates <- sum(non_diag)
 Q_template[non_diag] <- seq(nrates)
 
-traits <- with(as.data.frame(primate.discrete2), trait2)
+traits <- with(as.data.frame(primate.discrete2), trait2+1)
 TMBdata <- tibble::lst(Q_template, tree = p1, d = 2, trait_values = traits)
 
-pars <- list(trans_rates=rep(1,nrates))
+pars <- list(trans_rates=c(0.25, 0.75))
 prune_nll(pars)
 
-ff <- RTMB::MakeADFun(func = prune_nll, parameters = list(trans_rates = trans_rates), silent = TRUE)
+ff <- RTMB::MakeADFun(func = prune_nll,
+                      parameters = list(trans_rates = trans_rates), silent = TRUE)
 
 ## BMB: Kristensen et al claim nlminb works better for the problems they tried
-ff1 <- nlminb(ff$par, ff$fn, ff$gr)
+fit_2by2 <- nlminb(ff$par, ff$fn, ff$gr)
 
 # make_myfun <- function(data) {
 #  make_myfun <- function(fun, data) {
@@ -165,20 +166,33 @@ ff1 <- nlminb(ff$par, ff$fn, ff$gr)
 ```
 
 ```{r test1}
-traits = with(as.data.frame(primate.discrete2), 1 + (trait1*2 + trait2))
-TMBdata <- tibble::lst(Q_template, tree = p1, d = 4, trait_values = traits)
+traits <- with(as.data.frame(primate.discrete2), 1 + (trait1*2 + trait2))
+TMBdata <- tibble::lst(Q_template = Q_template4,
+                       tree = p1, d = 4, trait_values = traits)
 
 pars <- list(trans_rates = traits)
 prune_nll(pars)
+ff4 <- RTMB::MakeADFun(func = prune_nll,
+                      parameters = list(trans_rates = trans_rates), silent = TRUE)
+
+fit_4by4 <- suppressWarnings(
+  with(ff4, nlminb(par, fn, gr))
+)
+fit_4by4_optim <- with(ff4, optim(par, fn, gr, method = "BFGS"))
+fit_4by4_NM <- with(ff4, optim(par, fn, gr, method = "Nelder-Mead",
+                               control = list(maxit = 10000)))
+
+
+with(ff4$env, ff4$fn(last.par.best))
+with(ff4$env, ff4$gr(last.par.best))
 ```
 
 ## bigger transition matrices
 
-
-
-```{r}
+```{r corHMM-test}
 library(corHMM)
 data(primates)
 head(primates)
+with(primates, corHMM(tree, trait, rate.cat = 1))
 ```
 
