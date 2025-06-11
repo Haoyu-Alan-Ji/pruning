@@ -37,6 +37,35 @@ nodelabels()
 ```
 
 ## with RTMB
+```{r qtemp}
+## put indices in corresponding to allowed transitions
+states <- c("(0,0)", "(0,1)", "(1,0)", "(1,1)")
+Q_template <- matrix(0, 4, 4,
+                     dimnames = list(states, states))
+allowed <- matrix(c(2,1,
+                    3,1,
+                    1,2,
+                    4,2,
+                    1,3,
+                    4,3,
+                    3,4,
+                    2,4),
+                  ncol = 2,
+                  byrow = TRUE)
+Q_template[allowed] <- 1:8
+image(Matrix(Q_template))
+
+trans_rates <- abs(rnorm(8))
+Q_cur <- Q_template
+
+## start likelihood calculation here ...
+Q_cur[Q_cur!=0] <- trans_rates  ## fill in transition rate values
+diag(Q_cur) <- -rowSums(Q_cur) ## set diagonal
+## ... now compute the log-likelihood using this Q ...
+image(Matrix(Q_cur))
+
+rate.mat <- matrix(c(NA, 1, NA, 2, NA, 3, NA, 3, NA), 3, 3)
+```
 
 ```{r}
 traits = with(as.data.frame(primate.discrete2), 1 + (trait1*2 + trait2))
@@ -146,188 +175,9 @@ pars <- list(trans_rates = traits)
 prune_nll(pars)
 ```
 
-**BMB**: prefer chunk names that are all simple characters, excluding
-
-```{r two-by-two-RTMB}
-q22 <- function(pars) {
-
-  ## set up 2-by-2 template
-  Q_template <- matrix(0, 2, 2)
-  non_diag <- (row(Q_template) != col(Q_template))
-  Q_template[non_diag] <- 1:sum(non_diag)
-  tree <- reorder(p1, "pruningwise")
-
-  TMBdata <- tibble::lst(Q_template, tree, d = 2, trait_values = primate.discrete2[,"trait2"] + 1)
-
-  ff <- MakeADFun(prune_nll, pars, silent = TRUE)
-
-  ## BMB: Kristensen et al claim nlminb works better for the problems they tried
-  ff1 <- optim(ff$par, ff$fn, ff$gr, method = "BFGS")
-
-  ## BMB: in general I would *not* bother with all this stuff; all we really
-  ## care about is the results of the optimization
-  ## The comparison of values and the benchmarking are really just for testing purposes --
-  ##  worth doing at the beginning when we're developing stuff but not worth keeping in the
-  ##  long run
-  fngradwrap <- function(p) {
-    prune_nll(list(trans_rates = p))
-  }
-
-  finite_diff <- numDeriv::grad(fngradwrap, pars0$trans_rates)
-  AD <- ff$gr(pars0$trans_rates) ## evaluate *at starting parameter values* (for comparability)
-  ## if we just say ff$gr() it will evaluate the gradient at the fitted/optimized values
-
-  ## could also compare ff$gr() with numDeriv::grad(fngradwrap, ff1$par)
-  
-  mb1 <- microbenchmark(
-    AD = ff$gr(),
-    finite_diff = numDeriv::grad(fngradwrap, pars$trans_rates)
-  )
-
-  result <- list(
-    opt_ff = ff1,
-    ff = ff,
-    loglik = ff1$value,
-    par_hat = ff1$par,
-    AD = AD,
-    finite_diff = finite_diff,
-    mb1 = mb1
-  )
-
-  ## BMB: I usually wouldn't print these results since we're going
-  ##  to return the values anyway
-  ## cat('loglik:\n'); print(ff$fn(ff1$par))
-  ## cat('parameters:\n'); print(ff1$par)
-  
-  return(result)
-}
-
-pars0 <- list(trans_rates = c(0.5, 1.2))
-pp2 <- q22(pars0)
-
-#is this three the info we want? seems like very small diff
-
-## benchmark (speeds)
-pp2$mb1
-## these are the same now that we are evaluating both of them at the starting pars
-stopifnot(all.equal(drop(pp2$AD), pp2$finite_diff))
-```
-
-**BMB**: not sure what this chunk is doing?? Looks the same as above?
-```{r try-available-to-all-q, eval = FALSE}
-q00 <- function(pars) {
-  fn <- function(pars) {
-    ## allow sub-assignment, i.e. assignment to a particular row of a matrix
-    ## https://groups.google.com/g/tmb-users/c/HlPqkfcCa1g
-    "[<-" <- ADoverload("[<-")
-    "c" <- ADoverload("c")
-    "diag<-" <- ADoverload("diag<-")
-    getAll(pars)
-    if (is.numeric(trans_rates)) {
-      n <- length(trans_rates)
-      factors <- which(n %% 1:n == 0)
-      dim <- factors[length(factors)/2 + 1]
-      Q <- matrix(0, dim, dim)
-      non_diag <- (row(Q) != col(Q))
-      Q[non_diag] <- trans_rates ## fill in off-diagonals
-      diag(Q) <- -1*rowSums(Q)
-    }
-    liks <- matrix(NA, nrow = Ntip(p1) + p1$Nnode, ncol = dim)
-    ntips <- nrow(primate.discrete2)
-    liks[1:ntips,] <- 0
-    inds <- cbind(1:ntips, primate.discrete2[,"trait2"]+1)
-    liks[inds] <- 1
-    
-    p1 <- reorder(p1, "pruningwise")
-    comp <- numeric(nrow(liks))
-    anc <- unique(p1$edge[, 1])
-    for (i in anc) {
-      desRows <- which(p1$edge[, 1] == i)
-      desNodes <- p1$edge[desRows, 2]
-      v <- 1
-      for (d in seq_along(desRows)) {
-        t <- p1$edge.length[desRows[d]]
-        ## need Matrix::expm , then drop() to convert back to a vector
-        P <- Matrix::expm(Q * t)
-        v <- drop(v * (P %*% liks[desNodes[d], ]))
-      }
-      comp[i] <- sum(v)
-      liks[i, ] <- v / comp[i]
-      ## n.b. these numbers won't make sense in AD mode!
-    }
-    TIPS <- 1:Ntip(p1)
-    root <- Ntip(p1) + 1
-    root.p <- rep(0.5, 2)
-    neg_loglik <- -1*(sum(log(comp[-TIPS])) + log(sum(root.p * liks[root, ])))
-    return(neg_loglik)
-  }
-  
-  ff <- MakeADFun(fn, pars, silent = TRUE)
-  ff1 <- optim(ff$par, ff$fn, ff$gr, method = "BFGS")
-  
-  fngradwrap <- function(p) {
-    fn(list(trans_rates = p))
-  }
-  ## what are we trying to compare here?
-  finite_diff = numDeriv::grad(fngradwrap, pars0$trans_rates)
-  AD = ff$gr()
-  
-  mb1 <- microbenchmark(
-    AD = ff$gr(),
-    finite_diff = numDeriv::grad(fngradwrap, pars0$trans_rates)
-  )
-
-  result <- list(
-  opt_ff = ff1,
-  ff = ff,
-  loglik = ff1$value,
-  par_hat = ff1$par,
-  AD = AD,
-  finite_diff = finite_diff,
-  mb1 = mb1
-  )
-  
-  cat('loglik:\n'); print(ff$fn(ff1$par))
-  cat('parameters:\n'); print(ff1$par)
-  
-  return(result)
-}
-
-pars0 <- list(trans_rates = c(0.5, 1.2))
-pp3 <- q00(pars0)
-```
-
 ## bigger transition matrices
 
-```{r}
-## put indices in corresponding to allowed transitions
-states <- c("(0,0)", "(0,1)", "(1,0)", "(1,1)")
-Q_template <- matrix(0, 4, 4,
-                     dimnames = list(states, states))
-allowed <- matrix(c(2,1,
-                    3,1,
-                    1,2,
-                    4,2,
-                    1,3,
-                    4,3,
-                    3,4,
-                    2,4),
-                  ncol = 2,
-                  byrow = TRUE)
-Q_template[allowed] <- 1:8
-image(Matrix(Q_template))
 
-trans_rates <- abs(rnorm(8))
-Q_cur <- Q_template
-
-## start likelihood calculation here ...
-Q_cur[Q_cur!=0] <- trans_rates  ## fill in transition rate values
-diag(Q_cur) <- -rowSums(Q_cur) ## set diagonal
-## ... now compute the log-likelihood using this Q ...
-image(Matrix(Q_cur))
-
-rate.mat <- matrix(c(NA, 1, NA, 2, NA, 3, NA, 3, NA), 3, 3)
-```
 
 ```{r}
 library(corHMM)
