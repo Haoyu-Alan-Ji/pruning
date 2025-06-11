@@ -34,49 +34,18 @@ p1 <- primate.tree1
 plot(reorder(p1, "pruningwise"))
 tiplabels()
 nodelabels()
-
-# 2*2 q
-q01 <- 1.2
-q10 <- 0.5
-Q <- matrix(c(-1.2, 1.2,
-              0.5, -0.5), nrow = 2, byrow = TRUE)
-
-liks <- matrix(NA, nrow = Ntip(p1) + p1$Nnode, ncol = 2)
-
-ntips <- nrow(primate.discrete2)
-liks[1:ntips,] <- 0
-inds <- cbind(1:ntips, primate.discrete2[,"trait2"]+1)
-liks[inds] <- 1 #第二排性状为1的是trait2=1
-
-# calculate by pruningwise order
-p1 <- reorder(p1, "pruningwise")
-comp <- numeric(nrow(liks))
-anc <- unique(p1$edge[, 1])
-for (i in anc) {
-  desRows <- which(p1$edge[, 1] == i) #父节点对应的行索引
-  desNodes <- p1$edge[desRows, 2] # 父节点对应的子节点
-  v <- 1
-  for (d in seq_along(desRows)) { #遍历循环中对应这个值的父节点，返回的是索引
-    t <- p1$edge.length[desRows[d]] #索引在desRow里面返回对应的行号，得到t
-    P <- expm(Q * t)
-    v <- v * (P %*% liks[desNodes[d], ])
-  }
-  comp[i] <- sum(v)
-  liks[i, ] <- v / comp[i]
-  ## cat(i, liks[i,], "\n")
-}
-
-#loglik
-TIPS <- 1:Ntip(p1)
-root <- Ntip(p1) + 1
-root.p <- rep(0.5, 2)
-loglik <- sum(log(comp[-TIPS])) + log(sum(root.p * liks[root, ]))
-
-neg_loglik <- -loglik
-print(neg_loglik)
 ```
 
 ## with RTMB
+
+```{r}
+traits = with(as.data.frame(primate.discrete2), 1 + (trait1*2 + trait2))
+TMBdata <- tibble::lst(Q_template, tree = p1, d = 4, trait_values = traits)
+ff <- RTMB::MakeADFun(func = prune_nll, parameters = list(trans_rates = trans_rates), silent = TRUE)
+
+## BMB: Kristensen et al claim nlminb works better for the problems they tried
+ff1 <- nlminb(ff$par, ff$fn, ff$gr)
+```
 
 ```{r}
 ## TMBdata should contain:
@@ -91,6 +60,14 @@ print(neg_loglik)
 ## construct template for 2x2
 ## right now, now constraints on the transition matrix (i.e
 ## all elements can be non-zero)
+
+# ntri = 3
+# as.integer(round(0.5 * (1 + sqrt(1 + 8 * ntri))))
+# ## from length of (strictly) lower triangle, compute dimension of matrix
+# get_matdim <- function(ntri) {
+# as.integer(round(0.5 * (1 + sqrt(1 + 8 * ntri))))
+# }
+#d*(d-1)/2 == n solve
 
 prune_nll <- function(pars) {
   ## allow sub-assignment, i.e. assignment to a particular row of a matrix
@@ -115,11 +92,11 @@ prune_nll <- function(pars) {
     desRows <- which(tree$edge[, 1] == i)
     desNodes <- tree$edge[desRows, 2]
     v <- 1
-    for (d in seq_along(desRows)) {
-      t <- tree$edge.length[desRows[d]]
+    for (j in seq_along(desRows)) {
+      t <- tree$edge.length[desRows[j]]
       ## need Matrix::expm , then drop() to convert back to a vector
       P <- Matrix::expm(Q * t)
-      v <- drop(v * (P %*% liks[desNodes[d], ]))
+      v <- drop(v * (P %*% liks[desNodes[j], ]))
     }
     comp[i] <- sum(v)
     liks[i, ] <- v / comp[i]
@@ -134,6 +111,38 @@ prune_nll <- function(pars) {
 
 ## test
 pars <- list(trans_rates=c(1.2, 0.5))
+n <- length(pars$trans_rates)
+factors <- which(n %% 1:n == 0)
+dim <- factors[length(factors)/2 + 1]
+Q <- matrix(0, dim, dim)
+non_diag <- (row(Q) != col(Q))
+Q[non_diag] <- pars$trans_rates ## fill in off-diagonals
+diag(Q) <- -1*rowSums(Q)
+  
+traits = with(as.data.frame(primate.discrete2), trait2)
+TMBdata <- tibble::lst(Q, tree = p1, d = 2, trait_values = traits)
+
+pars <- list(trans_rates=traits)
+prune_nll(pars)
+
+
+ff <- RTMB::MakeADFun(func = prune_nll, parameters = list(trans_rates = trans_rates), silent = TRUE)
+
+## BMB: Kristensen et al claim nlminb works better for the problems they tried
+ff1 <- nlminb(ff$par, ff$fn, ff$gr)
+
+# make_myfun <- function(data) {
+#  make_myfun <- function(fun, data) {
+#      attach(data)
+#    MakeADFun(fun, pars)
+# }
+```
+
+```{r}
+traits = with(as.data.frame(primate.discrete2), 1 + (trait1*2 + trait2))
+TMBdata <- tibble::lst(Q_template, tree = p1, d = 4, trait_values = traits)
+
+pars <- list(trans_rates = traits)
 prune_nll(pars)
 ```
 
@@ -316,13 +325,13 @@ Q_cur[Q_cur!=0] <- trans_rates  ## fill in transition rate values
 diag(Q_cur) <- -rowSums(Q_cur) ## set diagonal
 ## ... now compute the log-likelihood using this Q ...
 image(Matrix(Q_cur))
+
+rate.mat <- matrix(c(NA, 1, NA, 2, NA, 3, NA, 3, NA), 3, 3)
 ```
 
 ```{r}
-traits <- with(as.data.frame(primate.discrete2), 1 + (trait1*2 + trait2))
-TMBdata <- tibble::lst(Q_template, tree, d = 4, trait_values = traits)
-ff <- RTMB::MakeADFun(func = prune_nll, parameters = list(trans_rates = trans_rates), silent = TRUE)
-
-## BMB: Kristensen et al claim nlminb works better for the problems they tried
-ff1 <- optim(ff$par, ff$fn, ff$gr, method = "BFGS")
+library(corHMM)
+data(primates)
+head(primates)
 ```
+
