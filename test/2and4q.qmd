@@ -67,16 +67,7 @@ image(Matrix(Q_cur))
 rate.mat <- matrix(c(NA, 1, NA, 2, NA, 3, NA, 3, NA), 3, 3)
 ```
 
-```{r}
-traits = with(as.data.frame(primate.discrete2), 1 + (trait1*2 + trait2))
-TMBdata <- tibble::lst(Q_template, tree = p1, d = 4, trait_values = traits)
-ff <- RTMB::MakeADFun(func = prune_nll, parameters = list(trans_rates = trans_rates), silent = TRUE)
-
-## BMB: Kristensen et al claim nlminb works better for the problems they tried
-ff1 <- nlminb(ff$par, ff$fn, ff$gr)
-```
-
-```{r}
+```{r prune-nll}
 ## TMBdata should contain:
 ## * d (dimension/number of states)
 ## * Q_template (0 in disallowed transitions, i = 1, ..., n in allowed transitions -
@@ -137,7 +128,9 @@ prune_nll <- function(pars) {
   neg_loglik <- -1*(sum(log(comp[-TIPS])) + log(sum(root.p * liks[root, ])))
   return(neg_loglik)
 }
+```
 
+```{r test-prune-nll}
 ## test
 pars <- list(trans_rates=c(1.2, 0.5))
 n <- length(pars$trans_rates)
@@ -147,13 +140,17 @@ Q <- matrix(0, dim, dim)
 non_diag <- (row(Q) != col(Q))
 Q[non_diag] <- pars$trans_rates ## fill in off-diagonals
 diag(Q) <- -1*rowSums(Q)
-  
-traits = with(as.data.frame(primate.discrete2), trait2)
-TMBdata <- tibble::lst(Q, tree = p1, d = 2, trait_values = traits)
 
-pars <- list(trans_rates=traits)
+Q_template <- matrix(0, dim, dim)
+non_diag <- (row(Q) != col(Q))
+nrates <- sum(non_diag)
+Q_template[non_diag] <- seq(sum(non_diag))
+
+traits <- with(as.data.frame(primate.discrete2), trait2)
+TMBdata <- tibble::lst(Q_template, tree = p1, d = 2, trait_values = traits)
+
+pars <- list(trans_rates=rep(1,
 prune_nll(pars)
-
 
 ff <- RTMB::MakeADFun(func = prune_nll, parameters = list(trans_rates = trans_rates), silent = TRUE)
 
@@ -167,7 +164,7 @@ ff1 <- nlminb(ff$par, ff$fn, ff$gr)
 # }
 ```
 
-```{r}
+```{r test1}
 traits = with(as.data.frame(primate.discrete2), 1 + (trait1*2 + trait2))
 TMBdata <- tibble::lst(Q_template, tree = p1, d = 4, trait_values = traits)
 
