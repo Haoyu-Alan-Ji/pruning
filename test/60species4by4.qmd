@@ -27,12 +27,13 @@ library(corHMM)
 
 ```{r seed}
 set.seed(427)
+source("../R/pruning_funs.R")
 ```
 
 ```{r primate-tree1}
-source("../R/pruning_funs.R")
 load("../data/primates.rda")
-p1 <- reorder(primate.tree1, "pruningwise")
+data(primates)
+p2 <- reorder(primates$tree, "pruningwise")
 ```
 
 ## with RTMB
@@ -52,45 +53,25 @@ allowed <- matrix(c(2,1,
                   ncol = 2,
                   byrow = TRUE)
 Q_template4[allowed] <- 1:8
+
 log_trans_rates <- log(abs(rnorm(8)))
 ```
 
-```{r 2by2}
-## test
-Q_template2 <- matrix(0, 2, 2)
-allowed <- matrix(c(2,1,
-                    1,2),
-                  ncol = 2,
-                  byrow = TRUE)
-Q_template2[allowed] <- 1:2
-Q2by2 <- setup_Q(log(c(1.2, 0.5)), Q_template2)
 
-traits2 <- with(as.data.frame(primate.discrete2), trait2+1)
-TMBdata <- tibble::lst(Q_template = Q_template2, tree = p1, d = 2, trait_values = traits2)
+```{r}
+corHMM_fit <- with(primates, corHMM(tree, trait, rate.cat = 1))
 
-ff2 <- RTMB::MakeADFun(func = prune_nll,
-                      parameters = list(log_trans_rates = log(c(0.25, 0.75))), silent = TRUE)
-
-fit_2by2 <- nlminb(ff2$par, ff2$fn, ff2$gr)
-
-data_trait2 <- primate.discrete2[, c("species", "trait2")]
-corHMM_fit2 <- corHMM(p1, data_trait2, rate.cat = 1)
-```
-
-```{r 4by4, warning=FALSE}
-traits4 <- with(as.data.frame(primate.discrete2), 1 + (trait1*2 + trait2))
+traits <- with(as.data.frame(primates$trait), 1 + (T1*2 + T2))
 TMBdata <- tibble::lst(Q_template = Q_template4,
-                       tree = p1, d = 4, trait_values = traits4)
+                       tree = p2, d = 4, trait_values = traits)
 ff4 <- RTMB::MakeADFun(func = prune_nll,
                       parameters = list(log_trans_rates = log_trans_rates), silent = TRUE)
 
-fit_4by4 <- suppressWarnings(
-  with(ff4, nlminb(par, fn, gr))
-)
+suppressWarnings(with(ff4, nlminb(par, fn, gr)))
 
 with(ff4$env, ff4$fn(last.par.best))
 with(ff4$env, ff4$gr(last.par.best))
 
-corHMM_fit4 <- corHMM(p1, primate.discrete2, collapse = TRUE, rate.cat = 1)
+new <- hmm2prune(corHMM_fit)
 ```
-what are the differences in procedure between corHMM and our stuff?
+
