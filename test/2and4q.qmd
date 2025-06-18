@@ -74,7 +74,9 @@ ff2 <- RTMB::MakeADFun(func = prune_nll,
 fit_2by2 <- nlminb(ff2$par, ff2$fn, ff2$gr)
 
 data_trait2 <- primate.discrete2[, c("species", "trait2")]
-corHMM_fit2 <- corHMM(p1, data_trait2, rate.cat = 1)
+corHMM_fit2 <- corHMM(p1, data_trait2, rate.cat = 1, root.p = 'madfitz')
+
+new2 <- hmm2prune(corHMM_fit2)
 ```
 
 ```{r 4by4, warning=FALSE}

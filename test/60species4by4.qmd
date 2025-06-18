@@ -73,5 +73,6 @@ with(ff4$env, ff4$fn(last.par.best))
 with(ff4$env, ff4$gr(last.par.best))
 
 new <- hmm2prune(corHMM_fit)
+new
 ```
 
