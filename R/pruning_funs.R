@@ -51,7 +51,7 @@ hmm2prune <- function(corHMM_fit){
     p <- which(index.mat == id, arr.ind = TRUE)
     trans_rates[i] <- solution[p[1, 1], p[1, 2]]
   }
-  pars <- list(trans_rates = trans_rates)
+  pars <- list(log_trans_rates = log(trans_rates))
   result <- prune_nll(pars)
   return(result)
 }
