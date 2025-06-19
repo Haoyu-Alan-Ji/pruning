@@ -67,10 +67,8 @@ hmm2prune <- function(corHMM_fit){
 #' for any practical use case we have ...
 #' @param n (vector of) number of states (if n is a scalar, all traits have the same number of states)
 #' @param k number of traits (if n is a vector, k will be `length(n)`
-setup_Q_template <- function(n=3, k= 2) {
-  if (length(n) > 1) {
-    k <- length(n)
-  } else {
+setup_Q_template <- function(n=3, k= 1) {
+  if (length(n) == 1) {
     n <- rep(n, k)
   }
   all_states <- do.call(expand.grid, lapply(n, \(x) 0:(x-1)))
@@ -79,18 +77,27 @@ setup_Q_template <- function(n=3, k= 2) {
   for (i in 1:ns) {
     ## exactly one state changes ...
     for (j in 1:ns) {
-      m[i,j] <- as.numeric(sum(all_states[i,] == all_states[j,])== 1)
+      m[i,j] <- as.numeric(sum(all_states[i,] != all_states[j,])== 1)
     }
   }
   return(m)
 }
 
-
-imat <- function(m) {
+  
+imat <- function(m, useRaster = TRUE, ...) {
   require(Matrix)
-  image(Matrix(m), useRaster = TRUE, xlab = "", ylab = "", sub = "")
+  image(Matrix(m), useRaster = useRaster, xlab = "", ylab = "", sub = "", ...)
 }
 
+## thought I could do a Kronecker product trick but now I don't see how ...
+## if (use_kron) {
+##   Q0 <- function(n) {
+##     m <- matrix(1, n, n)
+##     diag(m) <- 0
+##     m
+##   }
+##   return(Reduce(kronecker, lapply(n, Q0)))
+## }
 
 if (FALSE) {
   ## testing
@@ -99,3 +106,4 @@ if (FALSE) {
   imat(Q_big)
   dev.off()
 }
+
