@@ -63,45 +63,39 @@ hmm2prune <- function(corHMM_fit){
   return(result)
 }
 
-setup_Q_template <- function(ntraits=3, nstates = 2) {
-  ## machinery from corHMM/R/rate.mat.maker.R
-  ## in corHMM, nl = nstates, nk = ntraits
-  ## for now, n binary traits [expand to allow different numbers of states per trait??]
-  sn0 <- c(t(outer(0:(n-1), 0:(n-1), paste, sep = ",")))
-  states <- sprintf("(%s)", sn0)
-  mdim <- ntraits^nstates
-  matlist <- replicate(ntraits, matrix(NA, mdim, mdim))
-  ## binary digits
-  vecs 
-  Q_template <- matrix(0, length(states), length(states),
-                       dimnames = list(states, states))
-  ## how do we programmatically determine allowed states?
-
-  ## is there machinery in the 
-  allowed <- matrix(c(2,1,
-                    3,1,
-                    1,2,
-                    4,2,
-                    1,3,
-                    4,3,
-                    3,4,
-                    2,4),
-                  ncol = 2,
-                  byrow = TRUE)
-  Q_template[allowed] <- 1:8
+#' could do this faster (probably) with an iterated Kronecker product, but it's totally unnecessary
+#' for any practical use case we have ...
+#' @param n (vector of) number of states (if n is a scalar, all traits have the same number of states)
+#' @param k number of traits (if n is a vector, k will be `length(n)`
+setup_Q_template <- function(n=3, k= 2) {
+  if (length(n) > 1) {
+    k <- length(n)
+  } else {
+    n <- rep(n, k)
+  }
+  all_states <- do.call(expand.grid, lapply(n, \(x) 0:(x-1)))
+  ns <- prod(n)
+  m <- matrix(0, ns, ns)
+  for (i in 1:ns) {
+    ## exactly one state changes ...
+    for (j in 1:ns) {
+      m[i,j] <- as.numeric(sum(all_states[i,] == all_states[j,])== 1)
+    }
+  }
+  return(m)
 }
 
-nl <- 2
-k <- 3
-mat1 <- matrix(, nl^k, nl^k)
-mat2 <- matrix(, nl^k, nl^k)
-mat3 <- matrix(, nl^k, nl^k)
-      vec.tmp1 <- c(0, 1, 0, 0, 1, 1, 0, 1)
-      vec.tmp2 <- c(0, 0, 1, 0, 1, 0, 1, 1)
-      vec.tmp3 <- c(0, 0, 0, 1, 0, 1, 1, 1)
-      for (i in 1:(nl^k)) {
-        mat1[i, ] <- abs(vec.tmp1 - vec.tmp1[i])
-        mat2[i, ] <- abs(vec.tmp2 - vec.tmp2[i])
-        mat3[i, ] <- abs(vec.tmp3 - vec.tmp3[i])
-      }
-      matFINAL <- mat1 + mat2 + mat3
+
+imat <- function(m) {
+  require(Matrix)
+  image(Matrix(m), useRaster = TRUE, xlab = "", ylab = "", sub = "")
+}
+
+
+if (FALSE) {
+  ## testing
+  system.time(Q_big <- setup_Q_template(k=5)) ## 10 seconds
+  png("bigmat.png")
+  imat(Q_big)
+  dev.off()
+}
