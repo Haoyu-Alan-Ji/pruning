@@ -45,7 +45,8 @@ prune_nll <- function(pars) {
   return(neg_loglik)
 }
 
-hmm2prune <- function(corHMM_fit){
+## TO CHECK: check against parameters? against full matrix?
+hmm2prune <- function(corHMM_fit) {
   index.mat <- corHMM_fit$index.mat
   solution <- corHMM_fit$solution
   
@@ -63,10 +64,8 @@ hmm2prune <- function(corHMM_fit){
   return(result)
 }
 
-#' could do this faster (probably) with an iterated Kronecker product, but it's totally unnecessary
-#' for any practical use case we have ...
 #' @param n (vector of) number of states (if n is a scalar, all traits have the same number of states)
-#' @param k number of traits (if n is a vector, k will be `length(n)`
+#' @param k number of traits (only used if n is a scalar)
 setup_Q_template <- function(n=3, k= 1) {
   if (length(n) == 1) {
     n <- rep(n, k)
