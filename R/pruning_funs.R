@@ -68,6 +68,7 @@ hmm2prune <- function(corHMM_fit) {
 #' @param k number of traits (only used if n is a scalar)
 #' @examples
 #' setup_Q_template(n = 3, k = 2)
+#' setup_Q_template(n = 2, k = 3)
 setup_Q_template <- function(n=3, k= 1) {
   if (length(n) == 1) {
     n <- rep(n, k)
