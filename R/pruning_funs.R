@@ -8,13 +8,18 @@ setup_Q <- function(trans_rates, Q_template) {
 }
 
 #' @param pars named list of parameters (
-#' TMBdata should be a named list containing `tree` (a `phylo` object as defined in the `ape` package);
-#' trait_values (a vector of integer trait values, corresponding to states at tips
+#' TMBdata *should exist in the environment* and should
+#' be a named list containing
+#' - `tree` (a `phylo` object as defined in the `ape` package)
+#' - trait_values (a vector of integer trait values, corresponding to states at tips)
+#' - Q_template (a matrix with non-zero integer indices at all allowed locations)
 prune_nll <- function(pars) {
+  if (!require("RTMB")) stop("install RTMB package")
   "[<-" <- ADoverload("[<-")
   "c" <- ADoverload("c")
   "diag<-" <- ADoverload("diag<-")
   getAll(pars, TMBdata)
+  d <- ncol(Q_template)
   Q <- setup_Q(exp(log_trans_rates), Q_template)
   liks <- matrix(NA, nrow = Ntip(tree) + tree$Nnode, ncol = d)
   ntips <- length(trait_values)
@@ -45,10 +50,48 @@ prune_nll <- function(pars) {
   return(neg_loglik)
 }
 
+##' @examples
+#' n <- c(2, 3, 5)
+#' ## make up a random trait matrix
+#' set.seed(101)
+#' ss <- function(n) {
+#'   sample(0:(n-1), size = 10, replace = TRUE)
+#' }
+#' d <- cbind(ss(2), ss(3), ss(5))
+#' multitrait_to_int(d, c(2, 3, 5))
+multitrait_to_int <- function(d, n = NULL) {
+  if (is.null(n)) {
+    ## assume traits are zero-indexed
+    n <- apply(d, 2, max) + 1
+  } else if (length(n) == 1) {
+    n <- rep(n, ncol(d))
+  }
+  x <- rev(cumprod(rev(n)))
+  x <- c(x[-1], 1)  ## (15, 5, 1) for n = (2, 3, 5)
+  rowSums(sweep(d, MARGIN = 2, x, "*")) + 1
+}
+
 ## TO CHECK: check against parameters? against full matrix?
+#' @param corHMM_fit a fitted corHMM object
+#' @examples
+#' if (require("corHMM")) {
+#' ## example from ?corHMM
+#'     data(primates)
+#'     phy <- multi2di(primates[[1]])
+#'     data <- primates[[2]]
+#'     MK_3state <- corHMM(phy = phy, data = data, rate.cat = 1)
+#'  ## try it in prune_nll
+#'     TMBdata <- list(tree = phy,
+#'          trait_values = multitrait_to_int(data[,-1], c(2,2)),
+#'          Q_template = setup_Q_template(n=2, k=2))
+#'     try(hmm2prune(MK_3state))
+#' }
 hmm2prune <- function(corHMM_fit) {
   index.mat <- corHMM_fit$index.mat
   solution <- corHMM_fit$solution
+  if (ncol(TMBdata$Q_template) != ncol(index.mat)) {
+    stop("incompatibility between data and corHMM matrix (trait collapse??)")
+  }
   
   ids <- sort(na.omit(as.vector(index.mat)))
   trans_rates <- rep(0, length(ids))
@@ -69,7 +112,7 @@ hmm2prune <- function(corHMM_fit) {
 #' @examples
 #' setup_Q_template(n = 3, k = 2)
 #' setup_Q_template(n = 2, k = 3)
-setup_Q_template <- function(n=3, k= 1) {
+setup_Q_template <- function(n=3, k= 1, set_indices = TRUE) {
   if (length(n) == 1) {
     n <- rep(n, k)
   }
@@ -84,6 +127,9 @@ setup_Q_template <- function(n=3, k= 1) {
     }
   }
   dimnames(m) <- list(dimnms, dimnms)
+  if (set_indices) {
+    m[m!=0] <- seq_len(sum(m==1))
+  }
   return(m)
 }
 
