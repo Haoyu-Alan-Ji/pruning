@@ -55,30 +55,63 @@ Q_template4[allowed] <- 1:8
 log_trans_rates <- log(abs(rnorm(8)))
 ```
 
+```{r fun}
+setup_Q_template <- function(n=3, k= 1) {
+  if (length(n) == 1) {
+    n <- rep(n, k)
+  }
+  all_states <- do.call(expand.grid, lapply(n, \(x) 0:(x-1)))
+  ns <- prod(n)
+  m <- matrix(0, ns, ns)
+  for (i in 1:ns) {
+    ## exactly one state changes ...
+    for (j in 1:ns) {
+      m[i,j] <- as.numeric(sum(all_states[i,] != all_states[j,])== 1)
+    }
+  }
+  return(m)
+}
 
-```{r 2by2}
-## test
-Q_template2 <- matrix(0, 2, 2)
-allowed <- matrix(c(2,1,
-                    1,2),
-                  ncol = 2,
-                  byrow = TRUE)
-Q_template2[allowed] <- 1:2
+  
+imat <- function(m, useRaster = TRUE, ...) {
+  require(Matrix)
+  image(Matrix(m), useRaster = useRaster, xlab = "", ylab = "", sub = "", ...)
+}
 
-traits2 <- with(as.data.frame(primate.discrete2), trait2+1)
-TMBdata <- tibble::lst(Q_template = Q_template2, tree = p1, d = 2, trait_values = traits2)
+## thought I could do a Kronecker product trick but now I don't see how ...
+## if (use_kron) {
+##   Q0 <- function(n) {
+##     m <- matrix(1, n, n)
+##     diag(m) <- 0
+##     m
+##   }
+##   return(Reduce(kronecker, lapply(n, Q0)))
+## }
 
-prune_nll(list(log_trans_rates = log(c(0.25, 0.75))))
+if (FALSE) {
+  ## testing
+  system.time(Q_big <- setup_Q_template(k=5)) ## 10 seconds
+  png("bigmat.png")
+  imat(Q_big)
+  dev.off()
+}
 
-ff2 <- RTMB::MakeADFun(func = prune_nll,
-                      parameters = list(log_trans_rates = log(c(0.25, 0.75))), silent = TRUE)
+traitM <- function(n_tips, n_traits, prob = 0.5) {
+  m <- matrix(rbinom(n_tips * n_traits, size = 1, prob = prob),
+                nrow = n_tips, ncol = n_traits)
+  
+  colnames(m) <- paste0("trait", seq_len(n_traits))
+  rownames(m) <- paste0("tip", seq_len(n_tips))
+  
+  return(m)
+}
+```
 
-fit_2by2 <- nlminb(ff2$par, ff2$fn, ff2$gr)
-
-data_trait2 <- primate.discrete2[, c("species", "trait2")]
-corHMM_fit2 <- corHMM(p1, data_trait2, rate.cat = 1, root.p = 'madfitz')
-
-new2 <- hmm2prune(corHMM_fit2)
+```{r test1}
+tt1 <-  traitM(60,4)
+q42 <- setup_Q_template(4,2)
+q32 <- setup_Q_template(3,2)
+q31 <- setup_Q_template(3,1)
 ```
 
 ```{r 4by4, warning=FALSE}

@@ -59,7 +59,7 @@ log_trans_rates <- log(abs(rnorm(8)))
 
 
 ```{r}
-corHMM_fit <- with(primates, corHMM(tree, trait, rate.cat = 1))
+corHMM_fit <- with(primates, corHMM(tree, trait, root.p = 'madfitz', rate.cat = 1))
 
 traits <- with(as.data.frame(primates$trait), 1 + (T1*2 + T2))
 TMBdata <- tibble::lst(Q_template = Q_template4,

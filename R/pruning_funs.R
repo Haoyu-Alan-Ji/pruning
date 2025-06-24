@@ -106,3 +106,12 @@ if (FALSE) {
   dev.off()
 }
 
+traitM <- function(n_tips, n_traits, prob = 0.5) {
+  m <- matrix(rbinom(n_tips * n_traits, size = 1, prob = prob),
+              nrow = n_tips, ncol = n_traits)
+  
+  colnames(m) <- paste0("trait", seq_len(n_traits))
+  rownames(m) <- paste0("tip", seq_len(n_tips))
+  
+  return(m)
+}
