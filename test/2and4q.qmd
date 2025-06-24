@@ -78,7 +78,13 @@ fit_2by2 <- nlminb(ff2$par, ff2$fn, ff2$gr)
 data_trait2 <- primate.discrete2[, c("species", "trait2")]
 corHMM_fit2 <- corHMM(p1, data_trait2, rate.cat = 1, root.p = 'madfitz')
 
-new2 <- hmm2prune(corHMM_fit2)
+print(new2 <- hmm2prune(corHMM_fit2))
+prune_nll(list(log_trans_pars = c(-1.045189, -1.533869)))
+ff2$fn(c(-1.045189, -1.533869))
+
+c(prunefit = fit_2by2$objective,
+  HMMfit = -1*corHMM_fit2$loglik,
+  HMMprune = new2)
 ```
 
 ```{r 4by4, warning=FALSE}

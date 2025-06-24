@@ -64,10 +64,17 @@ corHMM_fit <- with(primates, corHMM(tree, trait, root.p = 'madfitz', rate.cat = 
 traits <- with(as.data.frame(primates$trait), 1 + (T1*2 + T2))
 TMBdata <- tibble::lst(Q_template = Q_template4,
                        tree = p2, d = 4, trait_values = traits)
+set.seed(102)
+log_trans_rates2 <- log(abs(rnorm(8)))
+set.seed(103)
+log_trans_rates3 <- log(abs(rnorm(8)))
+
 ff4 <- RTMB::MakeADFun(func = prune_nll,
-                      parameters = list(log_trans_rates = log_trans_rates), silent = TRUE)
+                      parameters = list(log_trans_rates = log_trans_rates3), silent = TRUE)
 
 suppressWarnings(with(ff4, nlminb(par, fn, gr)))
+## worth trying, but terrible fit ...
+## with(ff4, optim(par, fn, method = "Nelder-Mead", control = list(maxit = 1000)))
 
 with(ff4$env, ff4$fn(last.par.best))
 with(ff4$env, ff4$gr(last.par.best))
