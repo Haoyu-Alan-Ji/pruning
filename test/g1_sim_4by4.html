@@ -2,12 +2,12 @@
 <html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en"><head>
 
 <meta charset="utf-8">
-<meta name="generator" content="quarto-1.5.54">
+<meta name="generator" content="quarto-1.5.57">
 
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
 
 <meta name="author" content="Haoyu Ji-jih20">
-<meta name="dcterms.date" content="2025-06-18">
+<meta name="dcterms.date" content="2025-06-30">
 
 <title>My document</title>
 <style>
@@ -3103,7 +3103,7 @@ vertical-align: -.125em;
     <div>
     <div class="quarto-title-meta-heading">Published</div>
     <div class="quarto-title-meta-contents">
-      <p class="date">June 18, 2025</p>
+      <p class="date">June 30, 2025</p>
     </div>
   </div>
   
@@ -3127,106 +3127,54 @@ vertical-align: -.125em;
 <span id="cb1-9"><a href="#cb1-9" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(corHMM)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </div>
 <div class="cell">
-<div class="sourceCode cell-code" id="cb2"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a><span class="fu">set.seed</span>(<span class="dv">427</span>)</span>
-<span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a><span class="fu">source</span>(<span class="st">&quot;../R/pruning_funs.R&quot;</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="sourceCode cell-code" id="cb2"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a><span class="fu">set.seed</span>(<span class="dv">427</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </div>
 <div class="cell">
-<div class="sourceCode cell-code" id="cb3"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a><span class="fu">load</span>(<span class="st">&quot;../data/primates.rda&quot;</span>)</span>
-<span id="cb3-2"><a href="#cb3-2" aria-hidden="true" tabindex="-1"></a><span class="fu">data</span>(primates)</span>
-<span id="cb3-3"><a href="#cb3-3" aria-hidden="true" tabindex="-1"></a>p2 <span class="ot">&lt;-</span> <span class="fu">reorder</span>(primates<span class="sc">$</span>tree, <span class="st">&quot;pruningwise&quot;</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
-</div>
-<section id="with-rtmb" class="level2">
-<h2 class="anchored" data-anchor-id="with-rtmb">with RTMB</h2>
-<div class="cell">
-<div class="sourceCode cell-code" id="cb4"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a><span class="do">## put indices in corresponding to allowed transitions</span></span>
-<span id="cb4-2"><a href="#cb4-2" aria-hidden="true" tabindex="-1"></a>states <span class="ot">&lt;-</span> <span class="fu">c</span>(<span class="st">&quot;(0,0)&quot;</span>, <span class="st">&quot;(0,1)&quot;</span>, <span class="st">&quot;(1,0)&quot;</span>, <span class="st">&quot;(1,1)&quot;</span>)</span>
-<span id="cb4-3"><a href="#cb4-3" aria-hidden="true" tabindex="-1"></a>Q_template4 <span class="ot">&lt;-</span> <span class="fu">matrix</span>(<span class="dv">0</span>, <span class="dv">4</span>, <span class="dv">4</span>,</span>
-<span id="cb4-4"><a href="#cb4-4" aria-hidden="true" tabindex="-1"></a>                     <span class="at">dimnames =</span> <span class="fu">list</span>(states, states))</span>
-<span id="cb4-5"><a href="#cb4-5" aria-hidden="true" tabindex="-1"></a>allowed <span class="ot">&lt;-</span> <span class="fu">matrix</span>(<span class="fu">c</span>(<span class="dv">2</span>,<span class="dv">1</span>,</span>
-<span id="cb4-6"><a href="#cb4-6" aria-hidden="true" tabindex="-1"></a>                    <span class="dv">3</span>,<span class="dv">1</span>,</span>
-<span id="cb4-7"><a href="#cb4-7" aria-hidden="true" tabindex="-1"></a>                    <span class="dv">1</span>,<span class="dv">2</span>,</span>
-<span id="cb4-8"><a href="#cb4-8" aria-hidden="true" tabindex="-1"></a>                    <span class="dv">4</span>,<span class="dv">2</span>,</span>
-<span id="cb4-9"><a href="#cb4-9" aria-hidden="true" tabindex="-1"></a>                    <span class="dv">1</span>,<span class="dv">3</span>,</span>
-<span id="cb4-10"><a href="#cb4-10" aria-hidden="true" tabindex="-1"></a>                    <span class="dv">4</span>,<span class="dv">3</span>,</span>
-<span id="cb4-11"><a href="#cb4-11" aria-hidden="true" tabindex="-1"></a>                    <span class="dv">3</span>,<span class="dv">4</span>,</span>
-<span id="cb4-12"><a href="#cb4-12" aria-hidden="true" tabindex="-1"></a>                    <span class="dv">2</span>,<span class="dv">4</span>),</span>
-<span id="cb4-13"><a href="#cb4-13" aria-hidden="true" tabindex="-1"></a>                  <span class="at">ncol =</span> <span class="dv">2</span>,</span>
-<span id="cb4-14"><a href="#cb4-14" aria-hidden="true" tabindex="-1"></a>                  <span class="at">byrow =</span> <span class="cn">TRUE</span>)</span>
-<span id="cb4-15"><a href="#cb4-15" aria-hidden="true" tabindex="-1"></a>Q_template4[allowed] <span class="ot">&lt;-</span> <span class="dv">1</span><span class="sc">:</span><span class="dv">8</span></span>
-<span id="cb4-16"><a href="#cb4-16" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb4-17"><a href="#cb4-17" aria-hidden="true" tabindex="-1"></a>log_trans_rates <span class="ot">&lt;-</span> <span class="fu">log</span>(<span class="fu">abs</span>(<span class="fu">rnorm</span>(<span class="dv">8</span>)))</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="sourceCode cell-code" id="cb3"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a><span class="fu">source</span>(<span class="st">&quot;../R/pruning_funs.R&quot;</span>)</span>
+<span id="cb3-2"><a href="#cb3-2" aria-hidden="true" tabindex="-1"></a><span class="fu">load</span>(<span class="st">&quot;../data/primates.rda&quot;</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </div>
 <div class="cell">
-<div class="sourceCode cell-code" id="cb5"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a><span class="co">#corHMM_fit &lt;- with(primates, corHMM(tree, trait, rate.cat = 1))</span></span>
-<span id="cb5-2"><a href="#cb5-2" aria-hidden="true" tabindex="-1"></a><span class="fu">with</span>(primates, <span class="fu">corHMM</span>(tree, trait, <span class="at">rate.cat =</span> <span class="dv">1</span>))</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="sourceCode cell-code" id="cb4"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a>m3 <span class="ot">&lt;-</span> <span class="fu">rtree</span>(<span class="dv">20</span>)</span>
+<span id="cb4-2"><a href="#cb4-2" aria-hidden="true" tabindex="-1"></a><span class="co"># plot(reorder(m3, &quot;pruningwise&quot;))</span></span>
+<span id="cb4-3"><a href="#cb4-3" aria-hidden="true" tabindex="-1"></a><span class="co"># tiplabels()</span></span>
+<span id="cb4-4"><a href="#cb4-4" aria-hidden="true" tabindex="-1"></a><span class="co"># nodelabels()</span></span>
+<span id="cb4-5"><a href="#cb4-5" aria-hidden="true" tabindex="-1"></a>g1 <span class="ot">&lt;-</span> <span class="fu">reorder</span>(m3, <span class="st">&quot;pruningwise&quot;</span>)</span>
+<span id="cb4-6"><a href="#cb4-6" aria-hidden="true" tabindex="-1"></a>Q_template4 <span class="ot">&lt;-</span> <span class="fu">setup_Q_template</span>(<span class="dv">2</span>,<span class="dv">2</span>)</span>
+<span id="cb4-7"><a href="#cb4-7" aria-hidden="true" tabindex="-1"></a>log_trans_rates <span class="ot">&lt;-</span> <span class="fu">log</span>(<span class="fu">abs</span>(<span class="fu">rnorm</span>(<span class="dv">8</span>)))</span>
+<span id="cb4-8"><a href="#cb4-8" aria-hidden="true" tabindex="-1"></a>                       </span>
+<span id="cb4-9"><a href="#cb4-9" aria-hidden="true" tabindex="-1"></a>d <span class="ot">&lt;-</span> <span class="fu">get_multitrait</span>(<span class="fu">c</span>(<span class="dv">2</span> ,<span class="dv">2</span>), g1)</span>
+<span id="cb4-10"><a href="#cb4-10" aria-hidden="true" tabindex="-1"></a>traits4 <span class="ot">&lt;-</span> <span class="fu">multi_to_single</span>(d[,<span class="sc">-</span><span class="dv">1</span>], <span class="fu">c</span>(<span class="dv">2</span>, <span class="dv">2</span>))</span>
+<span id="cb4-11"><a href="#cb4-11" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-12"><a href="#cb4-12" aria-hidden="true" tabindex="-1"></a>TMBdata <span class="ot">&lt;-</span> <span class="fu">list</span>(<span class="at">Q_template =</span> Q_template4,</span>
+<span id="cb4-13"><a href="#cb4-13" aria-hidden="true" tabindex="-1"></a>                       <span class="at">tree =</span> g1, <span class="at">trait_values =</span> traits4)</span>
+<span id="cb4-14"><a href="#cb4-14" aria-hidden="true" tabindex="-1"></a>ff4 <span class="ot">&lt;-</span> RTMB<span class="sc">::</span><span class="fu">MakeADFun</span>(<span class="at">func =</span> prune_nll,</span>
+<span id="cb4-15"><a href="#cb4-15" aria-hidden="true" tabindex="-1"></a>                      <span class="at">parameters =</span> <span class="fu">list</span>(<span class="at">log_trans_rates =</span> log_trans_rates), <span class="at">silent =</span> <span class="cn">TRUE</span>)</span>
+<span id="cb4-16"><a href="#cb4-16" aria-hidden="true" tabindex="-1"></a>sim4p1 <span class="ot">&lt;-</span> <span class="fu">suppressWarnings</span>(</span>
+<span id="cb4-17"><a href="#cb4-17" aria-hidden="true" tabindex="-1"></a>  <span class="fu">with</span>(ff4, <span class="fu">nlminb</span>(par, fn, gr))</span>
+<span id="cb4-18"><a href="#cb4-18" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb4-19"><a href="#cb4-19" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-20"><a href="#cb4-20" aria-hidden="true" tabindex="-1"></a>cor_sim4U <span class="ot">&lt;-</span> <span class="fu">corHMM</span>(g1, d, <span class="at">root.p =</span> <span class="st">&#39;madfitz&#39;</span>, <span class="at">rate.cat =</span> <span class="dv">1</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 <div class="cell-output cell-output-stdout">
 <pre><code>State distribution in data:
-States: 1   2   3   
-Counts: 29  10  21  
+States: 1   2   3   4   
+Counts: 6   6   5   3   
 Beginning thorough optimization search -- performing 0 random restarts 
 Finished. Inferring ancestral states using marginal reconstruction. </code></pre>
 </div>
+<div class="sourceCode cell-code" id="cb6"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true" tabindex="-1"></a><span class="fu">print</span>(<span class="fu">with</span>(ff4<span class="sc">$</span>env, ff4<span class="sc">$</span><span class="fu">gr</span>(last.par.best)))</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 <div class="cell-output cell-output-stdout">
-<pre><code>
-Fit
-      -lnL      AIC     AICc Rate.cat ntax
- -41.90867 91.81735 92.54462        1   60
-
-Legend
-    1     2     3 
-&quot;0_0&quot; &quot;0_1&quot; &quot;1_1&quot; 
-
-Rates
-           (1,R1)     (2,R1)     (3,R1)
-(1,R1)         NA 0.01899864         NA
-(2,R1) 0.05664205         NA 0.02626388
-(3,R1)         NA 0.01610559         NA
-
-Arrived at a reliable solution </code></pre>
+<pre><code>              [,1]          [,2]         [,3]          [,4]         [,5]
+[1,] -5.165599e-07 -4.229489e-06 5.146606e-08 -3.330922e-06 2.599079e-06
+             [,6]         [,7]         [,8]
+[1,] 2.539705e-09 -1.89649e-06 3.231379e-06</code></pre>
 </div>
-<div class="sourceCode cell-code" id="cb8"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb8-1"><a href="#cb8-1" aria-hidden="true" tabindex="-1"></a>traits <span class="ot">&lt;-</span> <span class="fu">with</span>(<span class="fu">as.data.frame</span>(primates<span class="sc">$</span>trait), <span class="dv">1</span> <span class="sc">+</span> (T1<span class="sc">*</span><span class="dv">2</span> <span class="sc">+</span> T2))</span>
-<span id="cb8-2"><a href="#cb8-2" aria-hidden="true" tabindex="-1"></a>TMBdata <span class="ot">&lt;-</span> tibble<span class="sc">::</span><span class="fu">lst</span>(<span class="at">Q_template =</span> Q_template4,</span>
-<span id="cb8-3"><a href="#cb8-3" aria-hidden="true" tabindex="-1"></a>                       <span class="at">tree =</span> p2, <span class="at">d =</span> <span class="dv">4</span>, <span class="at">trait_values =</span> traits)</span>
-<span id="cb8-4"><a href="#cb8-4" aria-hidden="true" tabindex="-1"></a>ff4 <span class="ot">&lt;-</span> RTMB<span class="sc">::</span><span class="fu">MakeADFun</span>(<span class="at">func =</span> prune_nll,</span>
-<span id="cb8-5"><a href="#cb8-5" aria-hidden="true" tabindex="-1"></a>                      <span class="at">parameters =</span> <span class="fu">list</span>(<span class="at">log_trans_rates =</span> log_trans_rates), <span class="at">silent =</span> <span class="cn">TRUE</span>)</span>
-<span id="cb8-6"><a href="#cb8-6" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb8-7"><a href="#cb8-7" aria-hidden="true" tabindex="-1"></a><span class="fu">suppressWarnings</span>(<span class="fu">with</span>(ff4, <span class="fu">nlminb</span>(par, fn, gr)))</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="sourceCode cell-code" id="cb8"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb8-1"><a href="#cb8-1" aria-hidden="true" tabindex="-1"></a>new <span class="ot">&lt;-</span> <span class="fu">hmm2prune</span>(cor_sim4U)</span>
+<span id="cb8-2"><a href="#cb8-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb8-3"><a href="#cb8-3" aria-hidden="true" tabindex="-1"></a><span class="fu">print</span>(<span class="fu">c</span>(sim4p1<span class="sc">$</span>objective, <span class="sc">-</span>cor_sim4U<span class="sc">$</span>loglik, new))</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 <div class="cell-output cell-output-stdout">
-<pre><code>$par
-log_trans_rates log_trans_rates log_trans_rates log_trans_rates log_trans_rates 
-      0.5691758      18.0792530      -0.4574759      -6.2391054       2.2074343 
-log_trans_rates log_trans_rates log_trans_rates 
-     -4.0554883       1.3882484      -3.3348967 
-
-$objective
-[1] 50.9217
-
-$convergence
-[1] 1
-
-$iterations
-[1] 61
-
-$evaluations
-function gradient 
-      82       61 
-
-$message
-[1] &quot;false convergence (8)&quot;</code></pre>
-</div>
-<div class="sourceCode cell-code" id="cb10"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb10-1"><a href="#cb10-1" aria-hidden="true" tabindex="-1"></a><span class="fu">with</span>(ff4<span class="sc">$</span>env, ff4<span class="sc">$</span><span class="fu">fn</span>(last.par.best))</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
-<div class="cell-output cell-output-stdout">
-<pre><code>[1] 50.9217</code></pre>
-</div>
-<div class="sourceCode cell-code" id="cb12"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb12-1"><a href="#cb12-1" aria-hidden="true" tabindex="-1"></a><span class="fu">with</span>(ff4<span class="sc">$</span>env, ff4<span class="sc">$</span><span class="fu">gr</span>(last.par.best))</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
-<div class="cell-output cell-output-stdout">
-<pre><code>             [,1]          [,2]          [,3]         [,4]         [,5]
-[1,] 7.718077e-05 -3.493402e-06 -3.862878e-07 5.741856e-07 3.478936e-06
-              [,6]          [,7]          [,8]
-[1,] -6.067085e-05 -2.244083e-07 -5.711151e-05</code></pre>
+<pre><code>[1] 25.99836 25.95177 26.00267</code></pre>
 </div>
 </div>
-</section>
 
 </main>
 <!-- /main column -->
