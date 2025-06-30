@@ -32,101 +32,55 @@ set.seed(427)
 ```{r primate-tree1}
 source("../R/pruning_funs.R")
 load("../data/primates.rda")
+```
+
+```{r 4by4_tree1}
 p1 <- reorder(primate.tree1, "pruningwise")
-```
-
-## with RTMB
-```{r qtemp}
-## put indices in corresponding to allowed transitions
-states <- c("(0,0)", "(0,1)", "(1,0)", "(1,1)")
-Q_template4 <- matrix(0, 4, 4,
-                     dimnames = list(states, states))
-allowed <- matrix(c(2,1,
-                    3,1,
-                    1,2,
-                    4,2,
-                    1,3,
-                    4,3,
-                    3,4,
-                    2,4),
-                  ncol = 2,
-                  byrow = TRUE)
-Q_template4[allowed] <- 1:8
+Q_template4 <- setup_Q_template(2,2)
 log_trans_rates <- log(abs(rnorm(8)))
-```
+                       
+d <- get_multitrait(c(2 ,2), p1)
+traits4 <- multi_to_single(d[,-1], c(2, 2))
 
-```{r fun}
-setup_Q_template <- function(n=3, k= 1) {
-  if (length(n) == 1) {
-    n <- rep(n, k)
-  }
-  all_states <- do.call(expand.grid, lapply(n, \(x) 0:(x-1)))
-  ns <- prod(n)
-  m <- matrix(0, ns, ns)
-  for (i in 1:ns) {
-    ## exactly one state changes ...
-    for (j in 1:ns) {
-      m[i,j] <- as.numeric(sum(all_states[i,] != all_states[j,])== 1)
-    }
-  }
-  return(m)
-}
-
-  
-imat <- function(m, useRaster = TRUE, ...) {
-  require(Matrix)
-  image(Matrix(m), useRaster = useRaster, xlab = "", ylab = "", sub = "", ...)
-}
-
-## thought I could do a Kronecker product trick but now I don't see how ...
-## if (use_kron) {
-##   Q0 <- function(n) {
-##     m <- matrix(1, n, n)
-##     diag(m) <- 0
-##     m
-##   }
-##   return(Reduce(kronecker, lapply(n, Q0)))
-## }
-
-if (FALSE) {
-  ## testing
-  system.time(Q_big <- setup_Q_template(k=5)) ## 10 seconds
-  png("bigmat.png")
-  imat(Q_big)
-  dev.off()
-}
-
-traitM <- function(n_tips, n_traits, prob = 0.5) {
-  m <- matrix(rbinom(n_tips * n_traits, size = 1, prob = prob),
-                nrow = n_tips, ncol = n_traits)
-  
-  colnames(m) <- paste0("trait", seq_len(n_traits))
-  rownames(m) <- paste0("tip", seq_len(n_tips))
-  
-  return(m)
-}
-```
-
-```{r test1}
-tt1 <-  traitM(60,4)
-q42 <- setup_Q_template(4,2)
-q32 <- setup_Q_template(3,2)
-q31 <- setup_Q_template(3,1)
-```
-
-```{r 4by4, warning=FALSE}
-traits4 <- with(as.data.frame(primate.discrete2), 1 + (trait1*2 + trait2))
-TMBdata <- tibble::lst(Q_template = Q_template4,
-                       tree = p1, d = 4, trait_values = traits4)
+TMBdata <- list(Q_template = Q_template4,
+                       tree = p1, trait_values = traits4)
 ff4 <- RTMB::MakeADFun(func = prune_nll,
                       parameters = list(log_trans_rates = log_trans_rates), silent = TRUE)
-
-fit_4by4 <- suppressWarnings(
+sim4p1 <- suppressWarnings(
   with(ff4, nlminb(par, fn, gr))
 )
 
-with(ff4$env, ff4$fn(last.par.best))
-with(ff4$env, ff4$gr(last.par.best))
+cor_sim4U <- corHMM(p1, d, root.p = 'madfitz', rate.cat = 1)
 
-corHMM_fit4 <- corHMM(p1, primate.discrete2, collapse = TRUE, rate.cat = 1)
+print(with(ff4$env, ff4$gr(last.par.best)))
+
+new <- hmm2prune(cor_sim4U)
+
+print(c(sim4p1$objective, -cor_sim4U$loglik, new))
 ```
+
+```{r 4by4_tree2}
+data(primates)
+p2 <- reorder(primates$tree, "pruningwise")
+Q_template4 <- setup_Q_template(2,2)
+log_trans_rates <- log(abs(rnorm(8)))
+d <- get_multitrait(c(2 ,2), p2)
+traits4 <- multi_to_single(d[,-1], c(2, 2))
+
+TMBdata <- list(Q_template = Q_template4,
+                       tree = p2, trait_values = traits4)
+ff4 <- MakeADFun(func = prune_nll,
+                      parameters = list(log_trans_rates = log_trans_rates), silent = TRUE)
+sim4p2 <- suppressWarnings(
+  with(ff4, nlminb(par, fn, gr))
+)
+
+cor_sim4U <- corHMM(p2, d, root.p = 'madfitz', rate.cat = 1)
+
+print(with(ff4$env, ff4$gr(last.par.best)))
+
+new <- hmm2prune(cor_sim4U)
+
+print(c(sim4p2$objective, -cor_sim4U$loglik, new))
+```
+
