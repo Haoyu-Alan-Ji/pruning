@@ -34,7 +34,7 @@ source("../R/pruning_funs.R")
 load("../data/primates.rda")
 ```
 
-```{r 4by4_tree1}
+```{r 4by4_tree1_setup}
 p1 <- reorder(primate.tree1, "pruningwise")
 Q_template4 <- setup_Q_template(2,2)
 log_trans_rates <- log(abs(rnorm(8)))
@@ -49,12 +49,44 @@ ff4 <- RTMB::MakeADFun(func = prune_nll,
 sim4p1 <- suppressWarnings(
   with(ff4, nlminb(par, fn, gr))
 )
+```
 
-cor_sim4U <- corHMM(p1, d, root.p = 'madfitz', rate.cat = 1)
+## try out many fits
 
-print(with(ff4$env, ff4$gr(last.par.best)))
+```{r random-refits, cache= TRUE}
+random_refit(ff4)
+
+set.seed(101)
+result_frame <- suppressWarnings(
+  replicate(1000, simplify = FALSE, random_refit(ff4))) |>
+  do.call(what = rbind)
+
+result_good <- subset(result_frame, convergence == 0)
+
+result_good$objective |>
+  round(3) |>
+  table()
+```
+
+```{r fit-corHMM, cache=TRUE}
+cor_sim4U <- corHMM(p1, d, root.p = 'madfitz', rate.cat = 1,
+                    nstarts = 20)
+```
+
+```{r compare-fits}
+bestpars <- result_good[which.min(result_good$objective),
+                        paste0("fitted", 1:8)] |> unlist()
+ff4$gr(bestpars)
 
 new <- hmm2prune(cor_sim4U)
 
-print(c(sim4p1$objective, -cor_sim4U$loglik, new))
+plot(ecdf(result_good$objective))
+
+print(c(ours = sim4p1$objective,
+        corHMM = -cor_sim4U$loglik,
+        corHMM2prune = new,
+        ours_best = min(result_good$objective)))
+
 ```
+
+Raue, Andreas, Marcel Schilling, Julie Bachmann, Andrew Matteson, Max Schelke, Daniel Kaschek, Sabine Hug, et al. “Lessons Learned from Quantitative Dynamical Modeling in Systems Biology.” PLOS ONE 8, no. 9 (September 30, 2013): e74335. https://doi.org/10.1371/journal.pone.0074335.

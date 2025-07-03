@@ -53,12 +53,53 @@ ff4 <- RTMB::MakeADFun(func = prune_nll,
 sim4p1 <- suppressWarnings(
   with(ff4, nlminb(par, fn, gr))
 )
+```
 
-cor_sim4U <- corHMM(g2, d, root.p = 'madfitz', rate.cat = 1)
 
+```{r random-refits, cache= TRUE}
+set.seed(101)
+result_frame <- suppressWarnings(
+  replicate(500, simplify = FALSE, random_refit(ff4))) |>
+  do.call(what = rbind)
+```
+
+```{r parallel-refits}
+library(parallel)
+cl <- makeCluster(min(10, detectCores()-1))
+tmpfun <- function(i) random_refit(ff4)
+clusterExport(cl, varlist = c("random_refit", "ff4",
+                              "TMBdata", "setup_Q"))
+invisible(clusterEvalQ(cl, library(ape)))
+system.time(
+  result_frame <- parLapply(cl, 1:500, tmpfun) |>
+    do.call(what=rbind)
+)
+```
+
+
+```{r check-random-fits}
+result_good <- subset(result_frame, convergence == 0)
+dim(result_good)
+
+result_good$objective |>
+  round(3) |>
+  table()
+```
+
+```{r}
+plot(ecdf(result_good$objective))
+```
+False convergence: see [here](https://stackoverflow.com/a/40049233/190277)
+
+```{r corHMM, cache = TRUE, eval =FALSE}
+system.time(
+  cor_sim4U <- corHMM(g2, d, root.p = 'madfitz', rate.cat = 1)
+)
+```
+
+```{r compare}
 print(with(ff4$env, ff4$gr(last.par.best)))
+##new <- hmm2prune(cor_sim4U)
 
-new <- hmm2prune(cor_sim4U)
-
-print(c(sim4p1$objective, -cor_sim4U$loglik, new))
+## print(c(sim4p1$objective, -cor_sim4U$loglik, new))
 ```

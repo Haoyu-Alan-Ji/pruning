@@ -34,7 +34,7 @@ source("../R/pruning_funs.R")
 load("../data/primates.rda")
 p1 <- reorder(primate.tree1, "pruningwise")
 ```
-
+f
 ## with RTMB
 ```{r qtemp}
 ## put indices in corresponding to allowed transitions
