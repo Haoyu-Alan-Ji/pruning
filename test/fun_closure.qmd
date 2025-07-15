@@ -22,7 +22,7 @@ library(corHMM)
 set.seed(427)
 ```
 
-```{r primate-tree1}
+```{r primate-tree1, message = FALSE, warning=FALSE}
 source("../R/pruningAD.R")
 load("../data/primates.rda")
 ```
@@ -33,6 +33,8 @@ tt1 <- pruningAD(tree = p1, trait = 2, state = 2, generate_trait = TRUE)
 ```
 
 ```{r}
-#tt2 <- pruningAD(tree = p1, traitMatrix = primate.discrete2, trait = 2, state = 2, generate_trait = FALSE, rep.times = 1)
+m3 <- rtree(20)
+g1 <- reorder(m3, "pruningwise")
+tt2 <- pruningAD(tree = g1, trait = 3, state = 2, generate_trait = TRUE)
 ```
 
