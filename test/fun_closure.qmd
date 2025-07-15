@@ -40,7 +40,7 @@ for (s in 1:100) {
   m3 <- rtree(20)
   g1 <- reorder(m3, "pruningwise")
   traitMatrix <- get_multitrait(c(state=2, trait=3), tree=g1)
-  dat.red <- phangorn::phyDat(traitMatrix[,-1],type="USER", levels=as.character(0:2))
+  dat.red <- phangorn::phyDat(traitMatrix[,-1],type="USER", levels=0:2)
   phy.tmp <- multi2di(g1)
   par.score <- phangorn::parsimony(phy.tmp, dat.red, method="fitch")/2
   tt2 <- try(pruningAD(tree = g1, traitMatrix = traitMatrix,
