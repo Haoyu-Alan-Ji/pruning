@@ -11,7 +11,6 @@ source("../R/random_refit.R")
 
 pruningAD <- function(tree, traitMatrix, trait, state, generate_trait = FALSE, rep.times = 100,
                       opt.args = NULL) {
-  set.seed(427)
   Q <- setup_Q_template(state,trait)
   pars.start <- log(abs(rnorm(sum(Q != 0))))
   
@@ -24,7 +23,6 @@ pruningAD <- function(tree, traitMatrix, trait, state, generate_trait = FALSE, r
   ff <- MakeADFun(cmb(prune_nll, Phylodata), list(log_trans_rates = pars.start), silent = TRUE)
   AD <- suppressWarnings(with(ff, do.call(nlminb, c(list(par, fn, gr), opt.args))))
   
-  set.seed(427)
   result_frame <- suppressWarnings(
     replicate(rep.times, simplify = FALSE, random_refit(ff))) |>
     do.call(what = rbind)
