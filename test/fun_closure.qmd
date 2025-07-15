@@ -1,0 +1,38 @@
+---
+title: "My document"
+author: "Haoyu Ji"
+format: 
+  html:
+    self-contained: true
+date: today
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(here)
+setwd(here::here())
+```
+
+```{r pkgs, message = FALSE, warning=FALSE}
+library(tidyverse); theme_set(theme_bw())
+library(corHMM)
+```
+
+```{r seed}
+set.seed(427)
+```
+
+```{r primate-tree1}
+source("../R/pruningAD.R")
+load("../data/primates.rda")
+```
+
+```{r}
+p1 <- reorder(primate.tree1, "pruningwise")
+tt1 <- pruningAD(tree = p1, trait = 2, state = 2, generate_trait = TRUE)
+```
+
+```{r}
+#tt2 <- pruningAD(tree = p1, traitMatrix = primate.discrete2, trait = 2, state = 2, generate_trait = FALSE, rep.times = 1)
+```
+

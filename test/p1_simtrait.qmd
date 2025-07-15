@@ -1,6 +1,6 @@
 ---
 title: "My document"
-author: "Haoyu Ji-jih20"
+author: "Haoyu Ji"
 format: 
   html:
     self-contained: true
@@ -14,14 +14,7 @@ setwd(here::here())
 ```
 
 ```{r pkgs, message = FALSE, warning=FALSE}
-library(Matrix)
-library(ape)
 library(tidyverse); theme_set(theme_bw())
-library(waldo)
-library(expm)
-library(RTMB)
-library(numDeriv) ## for testing gradients
-library(microbenchmark)
 library(corHMM)
 ```
 

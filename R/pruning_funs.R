@@ -152,7 +152,7 @@ hmm2prune <- function(corHMM_fit) {
   result <- prune_nll(pars)
   return(result)
 }
-  
+
 ##' @example 
 ##' if (FALSE) {
 ##' system.time(Q_big <- setup_Q_template(k=5)) ## 10 seconds

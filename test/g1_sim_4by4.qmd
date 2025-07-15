@@ -41,7 +41,7 @@ m3 <- rtree(20)
 # nodelabels()
 g1 <- reorder(m3, "pruningwise")
 Q_template4 <- setup_Q_template(2,2)
-log_trans_rates <- log(abs(rnorm(8)))
+log_trans_rates <- log(abs(rnorm(sum(Q_template4 != 0))))
                        
 d <- get_multitrait(c(2 ,2), g1)
 traits4 <- multi_to_single(d[,-1], c(2, 2))

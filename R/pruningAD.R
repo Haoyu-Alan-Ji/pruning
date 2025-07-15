@@ -1,0 +1,51 @@
+library(Matrix)
+library(ape)
+library(waldo)
+library(expm)
+library(RTMB)
+
+source("../R/Q_template.R")
+source("../R/generate_traits.R")
+source("../R/loglik.R")
+source("../R/random_refit.R")
+
+pruningAD <- function(tree, traitMatrix, trait, state, generate_trait = FALSE, rep.times = 100) {
+  set.seed(427)
+  Q <- setup_Q_template(state,trait)
+  pars.start <- log(abs(rnorm(sum(Q != 0))))
+  
+  if (generate_trait == TRUE) {
+    traitMatrix <- get_multitrait(c(state, trait), tree)
+  }
+  traitList <- multi_to_single(traitMatrix[,-1], c(state, trait))
+  Phylodata <- list(Q_template = Q, tree = tree, trait_values = traitList, traitMatrix = traitMatrix)
+  
+  ff <- MakeADFun(cmb(prune_nll, Phylodata), list(log_trans_rates = pars.start), silent = TRUE)
+  AD <- suppressWarnings(with(ff, nlminb(par, fn, gr)))
+  
+  set.seed(427)
+  result_frame <- suppressWarnings(
+    replicate(rep.times, simplify = FALSE, random_refit(ff))) |>
+    do.call(what = rbind)
+  
+  result_good <- subset(result_frame, convergence == 0)
+  
+  pars.best <- result_good[which.min(result_good$objective),
+                          paste0("fitted", 1:sum(Q != 0))] |> unlist()
+  gr.best <- ff$gr(pars.best)
+  obj.best <- ff$fn(pars.best)
+  fn.cdf <- ecdf(result_good$objective)
+  
+  result <- list(pars.best = pars.best,
+                 obj.best = obj.best,
+                 gr.best = gr.best,
+                 Phylo = Phylodata,
+                 pars.start = pars.start,
+                 fn.cdf = fn.cdf)
+  
+  cat('loglik:\n'); print(obj.best)
+  cat('pars:\n'); print(pars.best)
+  cat('loglik cdf:\n'); plot(fn.cdf)
+  class(result) <- "PAD"
+  return(result)
+}

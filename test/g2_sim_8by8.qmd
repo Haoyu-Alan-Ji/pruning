@@ -36,9 +36,6 @@ load("../data/primates.rda")
 
 ```{r 4by4_tree1}
 m4 <- rtree(100)
-# plot(reorder(m3, "pruningwise"))
-# tiplabels()
-# nodelabels()
 g2 <- reorder(m4, "pruningwise")
 Q_template8 <- setup_Q_template(2,3)
 log_trans_rates <- log(abs(rnorm(24)))
@@ -55,7 +52,7 @@ sim4p1 <- suppressWarnings(
 )
 ```
 
- ```{r parallel-refits, cache=TRUE}
+```{r parallel-refits, cache=TRUE}
  library(parallel)
  cl <- makeCluster(min(10, detectCores()-1))
  tmpfun <- function(i) random_refit(ff4)
@@ -66,19 +63,19 @@ sim4p1 <- suppressWarnings(
    result_frame <- parLapply(cl, 1:500, tmpfun) |>
 	 do.call(what=rbind)
  )
- ```
+```
 
 
- ```{r check-random-fits}
+```{r check-random-fits}
  result_good <- subset(result_frame, convergence == 0)
  dim(result_good)
 
  result_good$objective |>
    round(3) |>
    table()
- ```
+```
 
- ```{r}
+```{r}
  plot(ecdf(result_good$objective))
 ```
 False convergence: see [here](https://stackoverflow.com/a/40049233/190277)
