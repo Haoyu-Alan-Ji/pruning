@@ -1,5 +1,4 @@
 random_refit <- function(ff) {
-  set.seed(427)
   n <- length(ff$par)
   start <- log(abs(rnorm(n)))
   res <- with(ff, nlminb(start, fn, gr))
