@@ -27,14 +27,25 @@ source("../R/pruningAD.R")
 load("../data/primates.rda")
 ```
 
-```{r}
+```{r primate2}
 p1 <- reorder(primate.tree1, "pruningwise")
 tt1 <- pruningAD(tree = p1, trait = 2, state = 2, generate_trait = TRUE)
 ```
 
-```{r}
-m3 <- rtree(20)
-g1 <- reorder(m3, "pruningwise")
-tt2 <- pruningAD(tree = g1, trait = 3, state = 2, generate_trait = TRUE)
+```{r test2}
+bad <- rep(NA, 100)
+for (s in 1:100) {
+  cat(s, "\n")
+  set.seed(s)
+  m3 <- rtree(20)
+  g1 <- reorder(m3, "pruningwise")
+  traitMatrix <- get_multitrait(c(state=2, trait=3), tree=g1)
+  dat.red <- phangorn::phyDat(traitMatrix[,-1],type="USER", levels=as.character(0:2))
+  phy.tmp <- multi2di(g1)
+  par.score <- phangorn::parsimony(phy.tmp, dat.red, method="fitch")/2
+  tt2 <- try(pruningAD(tree = g1, traitMatrix = traitMatrix,
+                       opt.args = list(eval.max=1000, iter.max = 1000)))
+  bad[s] <- inherits(tt2, "try-error")
+}
 ```
 

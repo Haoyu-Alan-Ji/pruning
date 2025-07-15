@@ -9,7 +9,8 @@ source("../R/generate_traits.R")
 source("../R/loglik.R")
 source("../R/random_refit.R")
 
-pruningAD <- function(tree, traitMatrix, trait, state, generate_trait = FALSE, rep.times = 100) {
+pruningAD <- function(tree, traitMatrix, trait, state, generate_trait = FALSE, rep.times = 100,
+                      opt.args = NULL) {
   set.seed(427)
   Q <- setup_Q_template(state,trait)
   pars.start <- log(abs(rnorm(sum(Q != 0))))
@@ -21,7 +22,7 @@ pruningAD <- function(tree, traitMatrix, trait, state, generate_trait = FALSE, r
   Phylodata <- list(Q_template = Q, tree = tree, trait_values = traitList, traitMatrix = traitMatrix)
   
   ff <- MakeADFun(cmb(prune_nll, Phylodata), list(log_trans_rates = pars.start), silent = TRUE)
-  AD <- suppressWarnings(with(ff, nlminb(par, fn, gr)))
+  AD <- suppressWarnings(with(ff, do.call(nlminb, c(list(par, fn, gr), opt.args))))
   
   set.seed(427)
   result_frame <- suppressWarnings(
@@ -29,6 +30,12 @@ pruningAD <- function(tree, traitMatrix, trait, state, generate_trait = FALSE, r
     do.call(what = rbind)
   
   result_good <- subset(result_frame, convergence == 0)
+
+  if (nrow(result_good) == 0) {
+    tt <- table(result_frame$convergence)
+    stop("No good results found: all refits failed to converge: codes ",
+         paste(sprintf("code %s = %d", names(tt), tt), collapse = ", "))
+  }
   
   pars.best <- result_good[which.min(result_good$objective),
                           paste0("fitted", 1:sum(Q != 0))] |> unlist()
