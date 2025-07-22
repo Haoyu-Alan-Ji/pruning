@@ -4,6 +4,10 @@ source("../R/generate_traits.R")
 source("../R/Q_template.R")
 source("../R/loglik.R")
 
+c_cache <- "corHMM_cache.rda"
+if (file.exists(c_cache)) load(c_cache)
+cache_save_vars <- NULL
+
 ## for 'subplex' comparison (allow ... to be passed)
 remotes::install_github("astamm/nloptr", ref = remotes::github_pull("196"))
 ## BMB version of corHMM (for extras like returning deviance function)
@@ -42,11 +46,15 @@ traitMatrix <- sapply(s, function(x) to_bin(x-1)) |>
   t() |>
   as.data.frame() |>
   setname()
-                        
-t_corHMM <- system.time(
-  fit_corHMM <- corHMM(phy = g1, data = traitMatrix, rate.cat = 1,
-                      root.p = "maddfitz")
-)
+
+cache_save_vars <- c(cache_save_vars, c("t_corHMM", "fit_corHMM"))
+if (!exists("fit_corHMM")) {
+  t_corHMM <- system.time(
+    fit_corHMM <- corHMM(phy = g1, data = traitMatrix, rate.cat = 1,
+                         root.p = "maddfitz", return.devfun = TRUE)
+  )
+  save(list = cache_save_vars, file = c_cache)
+}
 
 ## slightly redundant because we already have `s`
 traitList <- multi_to_single(traitMatrix[,-1])
@@ -82,7 +90,7 @@ t_RTMB_BFGS <- system.time(
   )
 )
 
-## subplex fit as in 
+## subplex fit as in corHMM (
 opts <- list(algorithm = "NLOPT_LN_SBPLX",
              maxeval = "1000000", ftol_rel = 1.49011611938477e-08)
 t_RTMB_subplex <- system.time(
@@ -94,8 +102,11 @@ c(corHMM =
   RTMB_nlminb = fit_RTMB_nlminb$objective,
   RTMB_BFGS = fit_RTMB_BFGS$value,
   RTMB_subplex = fit_RTMB_subplex$objective)
-  
-  
+
+## RTMB is consistently different from corHMM
+##      corHMM  RTMB_nlminb    RTMB_BFGS RTMB_subplex 
+##    282.5865     283.3723     283.3723     283.3772 
+
 ## try repeated starts
 ## mean.change from within corHMM: [1] 0.4571788
 set.seed(101)
@@ -111,3 +122,9 @@ t2 <- system.time(
 plot(ecdf(r))
 table(r)
 
+## TO DO:
+## use hmm2prune to compare parameters (feed corHMM parameters to RTMB)
+## use devfun in BMB version of corHMM to compare (feed RTMB parameters to corHMM)
+
+## failure to find minimum?
+## difference in computing log-likelihood? (Priors, normalization constants, etc.) ?
