@@ -8,9 +8,9 @@ if (file.exists(c_cache)) load(c_cache)
 cache_save_vars <- NULL
 
 ## for 'subplex' comparison (allow ... to be passed)
-remotes::install_github("astamm/nloptr", ref = remotes::github_pull("196"))
+try(remotes::install_github("astamm/nloptr", ref = remotes::github_pull("196")))
 ## BMB version of corHMM (for extras like returning deviance function)
-remotes::install_github("bbolker/corHMM")
+try(remotes::install_github("bbolker/corHMM"))
 
 library(ape)
 library(phangorn)
@@ -29,7 +29,7 @@ set.seed(7)
 m3 <- rtree(ntaxa)
 g1 <- reorder(m3, "pruningwise")
 
-Q <- setup_Q_template(n=nstate, k = ntrait)
+Q0 <- Q <- setup_Q_template(n=nstate, k = ntrait)
 nrates <- sum(Q!=0)
 Q[Q!=0] <- rexp(nrates, rate = 10)
 ## simulate traits
@@ -71,10 +71,13 @@ if (!exists("fit_corHMM")) {
 perm <- c(1,5,3,7,2,6,4,8)
 ## so (corHMM states)[perm] → (RTMB states)
 ##  RTMB states[order(perm)] -> (corHMM states)
-Qperm <- Q[order(perm), order(perm)]
+Qperm <- Q0[order(perm), order(perm)]
 rperm <- Qperm[Qperm!=0]
 
-## should
+chk <- function() print(rperm)
+chk()
+
+
 ## slightly redundant because we already have `s`
 traitList <- multi_to_single(traitMatrix[,-1])
 
@@ -93,12 +96,16 @@ Q <- setup_Q_template(nstate,ntrait)
 np <- sum(Q!=0)
 starts <- log(sort(rexp(np, 1/mean.change), decreasing = TRUE))
 
+chk()
+
 ## set up RTMB objective function
 Phylodata <- list(Q_template = Q,
                   tree = g1, trait_values = traitList,
                   traitMatrix = traitMatrix)
 ff <- MakeADFun(cmb(prune_nll, Phylodata),
                 list(log_trans_rates = starts), silent = TRUE)
+
+chk()
 
 ## various fits ...
 opt.args <- NULL
@@ -121,20 +128,30 @@ t_RTMB_subplex <- system.time(
   fit_RTMB_subplex <- nloptr(x0 = starts, eval_f = ff$fn, opts = opts)
 )
 
+chk()
+
 c(corHMM = 
     -1*c(logLik(fit_corHMM)),
   RTMB_nlminb = fit_RTMB_nlminb$objective,
   RTMB_BFGS = fit_RTMB_BFGS$value,
   RTMB_subplex = fit_RTMB_subplex$objective)
 
+## RTMB is consistent across optimizers, but different from corHMM
+##      corHMM  RTMB_nlminb    RTMB_BFGS RTMB_subplex 
+##    282.5927     283.3723     283.3723     283.3772
+
+
 cbind(t_corHMM,
       t_RTMB_nlminb,
       t_RTMB_BFGS,
       t_RTMB_subplex)[c("user.self","sys.self","elapsed"),]
 
-## RTMB is consistent across optimizers, but different from corHMM
-##      corHMM  RTMB_nlminb    RTMB_BFGS RTMB_subplex 
-##    282.5927     283.3723     283.3723     283.3772
+##           t_corHMM t_RTMB_nlminb t_RTMB_BFGS t_RTMB_subplex
+## user.self  171.714          0.98       0.686         10.593
+## sys.self   291.099          0.00       0.000          0.000
+## elapsed    116.101          0.98       0.687         10.596
+
+chk()
 
 ## try repeated starts
 ## mean.change from within corHMM: [1] 0.4571788
@@ -153,12 +170,16 @@ table(r)
 plot(ecdf(r))
 table(r)
 
+chk()
+
 ## index matrix from fit_corHMM
 ## non-zero/NA positions are the same
 stopifnot(identical(which(!is.na(fit_corHMM$index.mat), arr.ind = TRUE),
                     which(Q != 0, arr.ind = TRUE)))
 ## order/sequence of rates is the same
 stopifnot(identical(c(na.omit(c(fit_corHMM$index.mat))), Q[Q!=0]))
+
+chk()
 
 Q_sol <- Q
 Q_sol[Q_sol!=0] <- exp(fit_RTMB_nlminb$par)
@@ -173,7 +194,11 @@ print(m2, digits = 3)
 
 grid.arrange(image(m1), image(m2), nrow = 1)
 
+chk()
+
 ## compare computed log-likelihoods
+
+print(rperm)  ## how did rperm get corrupted?
 
 with(fit_corHMM, do.call(devfun, args.list)) ## 282.5927, recover value from fit
 ff$fn(fit_corHMM$args.list$p[order(rperm)]) ## 283.4434
