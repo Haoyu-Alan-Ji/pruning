@@ -230,10 +230,10 @@ plot_dat <- transform(plot_dat, par = reorder(par, est))
 ggplot(plot_dat, aes(est, par, colour = method)) +
   geom_pointrange(aes(xmin = est-2*se, xmax = est+2*se), position = position_dodge(width = 0.5))
 
+## TO DO:
 
-
-
-
-
-
+## try with priors?
+## try with lower/upper bounds matching corHMM's?
+## prettify Matrix plots
+## understand state-order mismatch?
 
