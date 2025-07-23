@@ -8,7 +8,8 @@ setup_Q_template <- function(n=3, k= 1, set_indices = TRUE) {
     n <- rep(n, k)
   }
   all_states <- do.call(expand.grid, lapply(n, \(x) 0:(x-1)))
-  dimnms <- apply(all_states, 1, \(x) sprintf("(%s)", paste(x, collapse = ",")))
+  ## dimnms to match corHMM standard
+  dimnms <- apply(all_states, 1, \(x) paste(x, collapse = "|"))
   ns <- prod(n)
   m <- matrix(0, ns, ns)
   for (i in 1:ns) {
