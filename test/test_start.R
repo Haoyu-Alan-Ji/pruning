@@ -74,10 +74,6 @@ perm <- c(1,5,3,7,2,6,4,8)
 Qperm <- Q0[order(perm), order(perm)]
 rperm <- Qperm[Qperm!=0]
 
-chk <- function() print(rperm)
-chk()
-
-
 ## slightly redundant because we already have `s`
 traitList <- multi_to_single(traitMatrix[,-1])
 
@@ -96,16 +92,15 @@ Q <- setup_Q_template(nstate,ntrait)
 np <- sum(Q!=0)
 starts <- log(sort(rexp(np, 1/mean.change), decreasing = TRUE))
 
-chk()
 
 ## set up RTMB objective function
 Phylodata <- list(Q_template = Q,
                   tree = g1, trait_values = traitList,
                   traitMatrix = traitMatrix)
+
 ff <- MakeADFun(cmb(prune_nll, Phylodata),
                 list(log_trans_rates = starts), silent = TRUE)
 
-chk()
 
 ## various fits ...
 opt.args <- NULL
@@ -128,7 +123,10 @@ t_RTMB_subplex <- system.time(
   fit_RTMB_subplex <- nloptr(x0 = starts, eval_f = ff$fn, opts = opts)
 )
 
-chk()
+opt.args <- list(lower = log(1e-9), upper = log(100))
+fit_RTMB_nlminb_bound <- suppressWarnings(
+    with(ff, do.call(nlminb, c(list(par, fn, gr), opt.args)))
+)
 
 c(corHMM = 
     -1*c(logLik(fit_corHMM)),
@@ -151,7 +149,6 @@ cbind(t_corHMM,
 ## sys.self   291.099          0.00       0.000          0.000
 ## elapsed    116.101          0.98       0.687         10.596
 
-chk()
 
 ## try repeated starts
 ## mean.change from within corHMM: [1] 0.4571788
@@ -161,16 +158,13 @@ t2 <- system.time(
     cat(".")
     ## starts <- log(sort(rexp(np, 1/mean.change), decreasing = TRUE))
     starts <- log(rexp(np, 1/mean.change))
-    fit <- suppressWarnings(with(ff, do.call(nlminb, c(list(par, fn, gr)))))
+    fit <- suppressWarnings(with(ff, do.call(nlminb, c(list(starts, fn, gr)))))
     fit$objective
   })
 )
-## all identical, regardless of starting value
-table(r)
+## 
+table(round(r,5))
 plot(ecdf(r))
-table(r)
-
-chk()
 
 ## index matrix from fit_corHMM
 ## non-zero/NA positions are the same
@@ -179,7 +173,6 @@ stopifnot(identical(which(!is.na(fit_corHMM$index.mat), arr.ind = TRUE),
 ## order/sequence of rates is the same
 stopifnot(identical(c(na.omit(c(fit_corHMM$index.mat))), Q[Q!=0]))
 
-chk()
 
 Q_sol <- Q
 Q_sol[Q_sol!=0] <- exp(fit_RTMB_nlminb$par)
@@ -194,12 +187,8 @@ print(m2, digits = 3)
 
 grid.arrange(image(m1), image(m2), nrow = 1)
 
-chk()
 
 ## compare computed log-likelihoods
-
-print(rperm)  ## how did rperm get corrupted?
-
 with(fit_corHMM, do.call(devfun, args.list)) ## 282.5927, recover value from fit
 ff$fn(fit_corHMM$args.list$p[order(rperm)]) ## 283.4434
 
@@ -237,3 +226,16 @@ ggplot(plot_dat, aes(est, par, colour = method)) +
 ## prettify Matrix plots
 ## understand state-order mismatch?
 
+
+if (FALSE) {
+### stepping through calculation:
+## For RTMB
+debug(prune_nll)
+prune_nll(list(log_trans_rates = p0), Phylodata)
+
+##
+debug(fit_corHMM$devfun)
+debug(corHMM:::dev.corhmm)
+do.call(fit_corHMM$devfun, alist)  ## 282.6504
+
+}
