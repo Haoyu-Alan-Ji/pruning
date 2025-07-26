@@ -1,0 +1,2 @@
+1. fork and change corhmm.R 414-522, including their pruning
+
