@@ -1,0 +1,132 @@
+---
+title: "My document"
+author: "Haoyu Ji-jih20"
+format: 
+  html:
+    self-contained: true
+date: today
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(here)
+setwd(here::here())
+```
+
+```{r pkgs, message = FALSE, warning=FALSE}
+library(Matrix)
+library(ape)
+library(tidyverse); theme_set(theme_bw())
+library(waldo)
+library(expm)
+library(RTMB)
+library(numDeriv) ## for testing gradients
+library(microbenchmark)
+library(corHMM)
+```
+
+```{r seed}
+set.seed(427)
+```
+
+```{r primate-tree1}
+source("../R/pruningAD.R")
+load("../data/primates.rda")
+```
+
+```{r}
+corhmm_nll <- function(p, phy, liks, Q, rate, rate.cat = 1) {
+  
+  p <- exp(p)
+  nb.tip <- length(phy$tip.label)
+  nb.node <- phy$Nnode
+  TIPS <- 1:nb.tip
+  comp <- numeric(nb.tip + nb.node)
+  #Obtain an object of all the unique ancestors
+  anc <- unique(phy$edge[,1])
+  k.rates <- dim(Q)[2] / 2
+  if (any(is.nan(p)) || any(is.infinite(p))) return(1000000)
+  
+  Q[] <- c(p, 0)[rate]
+  diag(Q) <- -rowSums(Q)
+  
+  # an error check for rates that are really weird
+  test_mat <- expm(Q, method=c("Ward77"))
+  if(any(round(rowSums(test_mat))> 2)){
+    return(1000000)
+  }
+  
+  for (i in seq(from = 1, length.out = nb.node)) {
+      #the ancestral node at row i is called focal
+      focal <- anc[i]
+      #Get descendant information of focal
+      desRows <- which(phy$edge[,1]==focal)
+      desNodes <- phy$edge[desRows,2]
+      v <- 1
+      #Loops through all descendants of focal (how we deal with polytomies):
+      for (desIndex in sequence(length(desRows))){
+          v <- v*expm(Q * phy$edge.length[desRows[desIndex]], method=c("Ward77")) %*% liks[desNodes[desIndex],]
+      }
+      
+      ##Allows for fixed nodes based on user input tree.
+      if(!is.null(phy$node.label)){
+          if(!is.na(phy$node.label[focal - nb.tip])){
+              fixer.tmp <- numeric(dim(Q)[2]/rate.cat)
+              fixer.tmp[phy$node.label[focal - nb.tip]] <- 1
+              fixer <- rep(fixer.tmp, rate.cat)
+              v <- v * fixer
+          }
+      }
+      
+      #Sum the likelihoods:
+      comp[focal] <- sum(v)
+      #Divide each likelihood by the sum to obtain probabilities:
+      liks[focal, ] <- v/comp[focal]
+  }
+  TIPS <- 1:Ntip(tree)
+  root <- Ntip(tree) + 1
+  root.p <- rep(1/dim(Q)[1], dim(Q)[1]) 
+  neg_loglik <- -1*(sum(log(comp[-TIPS])) + log(sum(root.p * liks[root, ])))
+  return(neg_loglik)
+}
+
+```
+
+```{r}
+pp1 <- reorder(primate.tree1, "pruningwise")
+tt1 <- pruningAD(tree = pp1, trait = 2, state = 2, generate_trait = TRUE, rep.times = 1)
+
+pars.start <- tt1$pars.start
+tree <- tt1$Phylo$tree
+rate <- tt1$Phylo$Q_template
+Q <- matrix(0, nrow = 4, ncol = 4)
+trait_values <- tt1$Phylo$trait_values
+liks <- matrix(NA, nrow = 15, ncol = 4)
+ntips <- 8
+liks[1:ntips,] <- 0
+for (i in 1:nrow(liks)) {
+  liks[i, trait_values[i]] <- 1
+}
+tt2 <- corhmm_nll(p = pars.start, phy = tree, Q = Q, rate = rate, liks = liks)
+```
+
+```{r}
+m3 <- rtree(20)
+gg1 <- reorder(m3, "pruningwise")
+
+tt3 <- pruningAD(tree = gg1, trait = 2, state = 2, generate_trait = TRUE, rep.times = 1)
+
+pars.start <- tt3$pars.start
+tree <- tt3$Phylo$tree
+rate <- tt3$Phylo$Q_template
+Q <- matrix(0, nrow = 4, ncol = 4)
+trait_values <- tt3$Phylo$trait_values
+liks <- matrix(NA, nrow = 39, ncol = 4)
+ntips <- 20
+liks[1:ntips,] <- 0
+for (i in 1:nrow(liks)) {
+  liks[i, trait_values[i]] <- 1
+}
+tt4 <- corhmm_nll(p = pars.start, phy = tree, Q = Q, rate = rate, liks = liks)
+```
+
