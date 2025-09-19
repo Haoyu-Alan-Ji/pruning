@@ -4,19 +4,17 @@ library(waldo)
 library(expm)
 library(RTMB)
 
-source("../R/Q_template.R")
-source("../R/generate_traits.R")
+source("R/Q_template.R")
+source("R/generate_traits.R")
 source("../R/loglik.R")
 source("../R/random_refit.R")
 
-pruningAD <- function(tree, traitMatrix, trait, state, generate_trait = FALSE, rep.times = 100,
-                      opt.args = NULL) {
-  Q <- setup_Q_template(state,trait)
-  pars.start <- log(abs(rnorm(sum(Q != 0))))
+pruningAD <- function(tree, traitMatrix, trait, state, rep.times = 100,
+                      meanrate = 1, opt.args = NULL) {
+  Q <- Q_template(state,trait)
+  nrates <- sum(Q != 0)
+  Q[Q!=0] <- rexp(nrates, rate = 1/meanrate)
   
-  if (generate_trait == TRUE) {
-    traitMatrix <- get_multitrait(c(state, trait), tree)
-  }
   traitList <- multi_to_single(traitMatrix[,-1], c(state, trait))
   Phylodata <- list(Q_template = Q, tree = tree, trait_values = traitList, traitMatrix = traitMatrix)
   

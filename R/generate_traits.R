@@ -15,15 +15,6 @@ get_multitrait <- function(trait_number, tree) {
   return(d)
 }
 
-##' @examples
-#' n <- c(2, 3, 5)
-#' ## make up a random trait matrix
-#' set.seed(101)
-#' ss <- function(n) {
-#'   sample(0:(n-1), size = 10, replace = TRUE)
-#' }
-#' d <- cbind(ss(2), ss(3), ss(5))
-#' multitrait_to_int(d, c(2, 3, 5))
 multi_to_single <- function(traits, n = NULL) {
   if (is.null(n)) {
     ## assume traits are zero-indexed
@@ -35,3 +26,4 @@ multi_to_single <- function(traits, n = NULL) {
   x <- c(x[-1], 1)  ## (15, 5, 1) for n = (2, 3, 5)
   rowSums(sweep(traits, MARGIN = 2, x, "*")) + 1
 }
+

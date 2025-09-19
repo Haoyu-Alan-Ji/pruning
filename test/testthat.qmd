@@ -1,0 +1,271 @@
+---
+title: "My document"
+author: "Haoyu Ji-jih20"
+format: 
+  html:
+    self-contained: true
+date: today
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(here)
+setwd(here::here())
+```
+
+```{r pkgs, message = FALSE, warning=FALSE}
+## https://github.com/bbolker/corHMM/blob/bolker_clean/misc/test_RTMB.R
+## remotes::install_github("bbolker/corHMM", ref = "bolker_clean")
+library(Matrix)
+library(ape)
+library(tidyverse); theme_set(theme_bw())
+library(waldo)
+library(expm)
+library(RTMB)
+library(numDeriv) ## for testing gradients
+library(microbenchmark)
+library(devtools)
+```
+
+```{r seed}
+set.seed(427)
+```
+
+```{r primate-tree1}
+source("../R/pruning_funs.R")
+load("../data/primates.rda")
+```
+
+```{r}
+#' @param n (vector of) number of states (if n is a scalar, all traits have the same number of states)
+#' @param k number of traits (only used if n is a scalar)
+#' @examples
+#' setup_Q_template(n = 3, k = 2)
+#' setup_Q_template(n = 2, k = 3)
+Q_template <- function(n=2, k= 3, set_indices = TRUE) {
+  if (length(n) == 1) {
+    n <- rep(n, k)
+  }
+  all_states <- do.call(expand.grid, lapply(n, \(x) 0:(x-1)))
+  ## dimnms to match corHMM standard
+  dimnms <- apply(all_states, 1, \(x) paste(x, collapse = "|"))
+  ns <- prod(n)
+  m <- matrix(0, ns, ns)
+  for (i in 1:ns) {
+    ## exactly one state changes ...
+    for (j in 1:ns) {
+      m[i,j] <- as.numeric(sum(all_states[i,] != all_states[j,])== 1)
+    }
+  }
+  dimnames(m) <- list(dimnms, dimnms)
+  if (set_indices) {
+    m[m!=0] <- seq_len(sum(m==1))
+  }
+  return(m)
+}
+
+
+## convert from enumerated traits (0-7) to 3 binary digits
+## https://stackoverflow.com/questions/6614283/converting-decimal-to-binary-in-r
+to_bin <- function(x, n = 2) {
+   intToBits(x) |> rev() |> as.integer() |> tail(n)
+}
+
+## setname <- function(x) {cbind(nm = rownames(x), x)}
+##' @param nstate number of states per trait (currently limited to 2)
+##' @param ntrait number of traits
+##' @param ntaxa number of taxa/phylogenty tips
+##' @param seed random-number seed
+##' @param meanrate mean transition rate
+##' @examples
+##' simfun(ntaxa = 8)
+simfun <- function(nstate = 2, ntrait = 2, ntaxa = 20, seed = NULL,
+                   meanrate = 1, seql = 1, collaps_allow = FALSE) {
+  if (nstate!=2) stop("oops, simSeq to trait matrix not implemented for nstate!=2, 
+                      to_bin's binary algorithm determines that the state can only be 2")
+  if (!is.null(seed)) set.seed(seed)
+  require("ape")
+  require("phangorn")
+  phy <- ape::rtree(ntaxa)
+  phy <- reorder(phy, "pruningwise")
+
+  Q <- Q_template(n=nstate, k= ntrait)
+  nrates <- sum(Q != 0)
+  Q[Q!=0] <- rexp(nrates, rate = 1/meanrate)
+  
+  s <- phangorn::simSeq(phy, l = seql, Q = Q,
+                        type = "USER", levels = seq(nstate^ntrait),
+                        rate = 1)
+  if (collaps_allow == FALSE) {
+    repeat {
+      s <- phangorn::simSeq(phy, l = seql, Q = Q,
+                            type = "USER", levels = seq(nstate^ntrait),
+                            rate = 1)
+      if (nrow(unique(as.character(s))) == prod(nstate^ntrait)) break
+    }
+  }
+  traitMatrix <- sapply(s, function(x) to_bin(x = x-1, n = ntrait)) |>
+    t() |>
+    as.data.frame() #|>
+    #setname()
+  
+  list(tree = phy, data = traitMatrix)
+}
+
+out <- simfun(nstate = 2, ntrait = 2, ntaxa = 20, seed = 2, meanrate = 1)
+```
+
+
+```{r}
+library(corHMM)
+library(rbenchmark)
+data("primates")
+phy <- reorder(primates$tree, "pruningwise")
+
+cfun  <- function(...) {
+  invisible(capture.output(x <- corHMM(...)))
+  x
+}
+parfun <- function(x) log(na.omit(c(x$solution)))
+
+fit_orig <- cfun(phy = phy, data = primates$trait, rate.cat = 1)
+print(fit_orig)
+
+fit_RTMB <- cfun(phy = phy, data = primates$trait, rate.cat = 1, use_RTMB = TRUE)
+
+stopifnot(all.equal(fit_orig$loglik, fit_RTMB$loglik, tolerance = 2e-8)) ## mean diff: 1.6e-8
+stopifnot(all.equal(parfun(fit_RTMB), parfun(fit_orig),
+                    tolerance = 2e-4))
+## Mean relative difference: 0.000103487
+
+## takes about 1-2 minutes
+bb <- benchmark(
+  cfun(phy = phy, data = primates$trait, rate.cat = 1),
+  cfun(phy = phy, data = primates$trait, rate.cat = 1, use_RTMB = TRUE),
+  replications = 20,
+  columns = c("test", "elapsed", "relative"))
+
+## a slightly unfair comparison because fit_orig() also does some model setup tasks.
+## but the bulk of the time is in the optimization ...
+
+##        test elapsed relative
+## 2 fit_new()   0.804    1.000
+## 1 fit_orig()  50.929   63.345
+```
+
+```{r}
+set.seed(101)
+fitfun  <- function(dat, ..., rate.cat = 1) {
+  tt <- system.time(
+    invisible(capture.output(x <- suppressWarnings(with(dat, corHMM(tree, data, rate.cat = rate.cat, ...)))))
+  )
+  attr(x, "time") <- tt
+  x
+}
+parfun <- function(x) log(na.omit(c(x$solution)))
+
+sumfun <- function(ntrait = 2, ntaxa = 200, model = "ARD", seed = NULL, ...) {
+  if (!is.null(seed)) set.seed(seed)
+  seed <- seed %||% NA
+  
+  ss <- simfun(ntrait = ntrait, ntaxa = ntaxa, seed = seed)
+  fit_orig <- fitfun(ss, model = model, ...)
+  fit_RTMB <- fitfun(ss, use_RTMB = TRUE, model = model, ...)
+  p_orig <- parfun(fit_orig)
+  p_RTMB <- parfun(fit_RTMB)
+  p_diff <- p_orig-p_RTMB
+  ## truncate par values at -10 (these diffs are mostly irrelevant)
+  p_orig_trunc <- pmax(p_orig, -10)
+  p_RTMB_trunc <- pmax(p_RTMB, -10)
+  p_diff_trunc <- p_orig_trunc - p_RTMB_trunc
+  ## get RMSE vs true rates on truncated scale ...
+  p_RTMB_rmse <- sqrt(mean((p_RTMB_trunc - ss$true_rates)^2))
+  p_orig_rmse <- sqrt(mean((p_orig_trunc - ss$true_rates)^2))
+  data.frame(seed, ntrait, ntaxa, model,
+             RTMB_opt.time = fit_RTMB$opt.time[["elapsed"]],
+             orig_opt.time = fit_orig$opt.time[["elapsed"]],
+             RTMB_tot.time = attr(fit_RTMB, "time")[["elapsed"]],
+             orig_tot.time = attr(fit_orig, "time")[["elapsed"]],
+             RTMB_loglik = fit_RTMB$loglik,
+             orig_loglik = fit_orig$loglik,
+             par.rmsdiff = sqrt(mean(p_diff^2)),
+             par.maxdiff = max(abs(p_diff)),
+             par.rmsdiff.trunc = sqrt(mean(p_diff_trunc^2)),
+             par.maxdiff.trunc = max(abs(p_diff_trunc)),
+             RTMB_rmse = p_RTMB_rmse,
+             orig_rmse = p_orig_rmse
+             )
+}
+
+ntaxvec <- round(exp(seq(log(20), log(1000), length.out = 15)))
+dd <- expand.grid(seed = 101:102, ntaxa = ntaxvec, ntrait = 2:3, model = c("ARD", "SYM")) |>
+  transform(model = as.character(model)) ## factor messes up do.call, converts to numeric
+
+## test
+sumfun(seed = 105, ntrait = 3, ntaxa = 20)
+
+res <- list()
+for (i in 1:nrow(dd)) {
+  print(dd[i,])
+  res[[i]] <- do.call(sumfun, dd[i,])
+  saveRDS(res, file = "../data/benchmark2.rds")
+}
+res <- do.call(rbind, res)
+saveRDS(res, file = "../data/benchmark2.rds")
+```
+
+```{r}
+## exploring differences ...
+dd <- readRDS("../data/benchmark2.rds")
+if (!is.data.frame(dd)) dd <- do.call(rbind, dd)
+print(nrow(dd))
+tail(dd)
+
+with(dd, summary(RTMB_loglik-orig_loglik))
+dd2 <- dd |>
+  mutate(ldiff = RTMB_loglik-orig_loglik) |>
+  arrange(ldiff) |>
+  mutate(n = seq(n()))
+
+## filter(dd2, ldiff<0) |> View()
+
+ggplot(dd2, aes(n, ldiff)) + geom_point()
+
+## will have to hack corHMM further: store convergence codes from optimizer?
+## explore: which cases are bad?
+## worst for smallest/overparameterized cases (3 traits/20 taxa, 2 traits/41 taxa)
+
+## for benchmark-1, 'model' was ignored
+ddt <- (dd
+  |> select(c(seed, ntrait, ntaxa, model, ends_with("time")))
+  |> pivot_longer(ends_with("time"))
+  |> mutate(across(name, ~ stringr::str_remove(., "\\.time$")))
+  |> separate(name, into = c("method", "type"), sep = "_")
+)
+
+dd_bad <- (dd |>
+           mutate(ldiff = RTMB_loglik-orig_loglik,
+                  bad = case_when(abs(ldiff)<(1e-2) ~ "OK",
+                                  ldiff < 0 ~ "RTMB",
+                                  ldiff > 0 ~ "orig")) |>
+           select(c(seed, ntrait, ntaxa, model, bad))
+)
+
+ddtb <- full_join(ddt, dd_bad,
+                  by = c("seed", "ntrait", "ntaxa", "model"))
+
+ggplot(ddt, aes(ntaxa, value, colour = method)) +
+  geom_point(aes(shape = factor(ntrait)), size = 8) +
+  scale_x_log10() + scale_y_log10() +
+  facet_wrap(~type) +
+  geom_smooth(aes(linetype = factor(ntrait)))
+## ntrait = 3 is *faster* on average?? hmmm ...
+
+
+ggplot(ddt, aes(ntaxa, value, colour = interaction(model, ntrait))) +
+  geom_point() +
+  scale_x_log10() + scale_y_log10() +
+  facet_wrap(~type) +
+  geom_smooth(aes(group=interaction(method, model, ntrait)), se  = FALSE)
+```
+

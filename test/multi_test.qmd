@@ -1,0 +1,74 @@
+---
+title: "multistart test"
+author: "Haoyu Ji"
+format: 
+  html:
+    self-contained: true
+date: today
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(here)
+setwd(here::here())
+```
+
+```{r pkgs, message = FALSE, warning=FALSE}
+## https://github.com/bbolker/corHMM/blob/bolker_clean/misc/test_RTMB.R
+## remotes::install_github("bbolker/corHMM", ref = "bolker_clean")
+library(Matrix)
+library(ape)
+library(tidyverse); theme_set(theme_bw())
+library(waldo)
+library(expm)
+library(RTMB)
+library(numDeriv)
+library(microbenchmark)
+library(devtools)
+```
+
+```{r seed}
+set.seed(427)
+```
+
+```{r funs}
+source('../R/Q_template.R')
+source('../R/getinfo.R')
+```
+
+Now it will only show 'Running 240/240'...quiet?
+```{r get_rds, eval=FALSE}
+ntaxvec <- round(exp(seq(log(20), log(1000), length.out = 15)))
+dd <- expand.grid(seed = 101:104, ntaxa = ntaxvec, ntrait = 2:3, model = c("ARD", "SYM"), 
+                  multistart = TRUE, try.times = 10, jitter.sd = 0.25, rate.cat = 1) |>
+  transform(model = as.character(model)) ## factor messes up do.call, converts to numeric
+
+res <- list()
+for (i in 1:nrow(dd)) {
+  cat(sprintf("\rRunning %d/%d", i, nrow(dd)))
+  flush.console()
+  res[[i]] <- do.call(sumfun, dd[i,])
+  saveRDS(res, file = "../data/multi1.rds")
+}
+res <- do.call(rbind, res)
+saveRDS(res, file = "../data/multi1.rds")
+```
+
+```{r}
+## exploring differences ...
+dd <- readRDS("../data/multi1.rds")
+if (!is.data.frame(dd)) dd <- as.data.frame(t(dd))
+
+with(dd, summary(as.numeric(RTMB_loglik)-as.numeric(orig_loglik)))
+dd2 <- dd |>
+  mutate(ldiff = as.numeric(RTMB_loglik)-as.numeric(orig_loglik)) |>
+  arrange(ldiff) |>
+  mutate(n = seq(n()))
+
+## filter(dd2, ldiff<0) |> View()
+
+ggplot(dd2, aes(n, ldiff)) + geom_point()
+
+```
+
+So, after multistart, RTMB will be better than orig?
