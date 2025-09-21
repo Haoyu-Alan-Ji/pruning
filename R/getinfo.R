@@ -19,7 +19,8 @@ bestfit  <- function(dat, ..., rate.cat = 1, multistart = 10, jitter.sd = 0.25) 
       p <- rexp(nrates, rate = 1)
       dat <- list(tree = dat$tree, data = dat$data, rate.mat = Q, p = p)
       
-      invisible(capture.output(suppressWarnings(x <- with(dat, corHMM(tree, data, rate.mat, p = p, rate.cat = rate.cat, ...)))))
+      invisible(capture.output(suppressWarnings(
+        x <- with(dat, corHMM(tree, data, rate.mat, p = p, rate.cat = rate.cat, ...)))))
       jitter <- pmin(pmax(rnorm(multistart-1, mean = 0, sd = jitter.sd), 0), 1)
       loglik <- list()
       model <- list()
@@ -29,7 +30,8 @@ bestfit  <- function(dat, ..., rate.cat = 1, multistart = 10, jitter.sd = 0.25) 
       for (i in 1:(multistart-1)) {
         p <- log(jitter[i] + exp(p))
         dat <- list(tree = dat$tree, data = dat$data, rate.mat = Q, p = p)
-        invisible(capture.output(suppressWarnings(y <- with(dat, corHMM(tree, data, rate.mat, p = p, rate.cat = rate.cat, ...)))))
+        invisible(capture.output(suppressWarnings(
+          y <- with(dat, corHMM(tree, data, rate.mat, p = p, rate.cat = rate.cat, ...)))))
         model[[i+1]] <- y
         loglik[i+1] <- y$loglik
       }

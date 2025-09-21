@@ -19,12 +19,8 @@ setwd(here::here())
 library(Matrix)
 library(ape)
 library(tidyverse); theme_set(theme_bw())
-library(waldo)
 library(expm)
 library(RTMB)
-library(numDeriv)
-library(microbenchmark)
-library(devtools)
 ```
 
 ```{r seed}
@@ -32,8 +28,8 @@ set.seed(427)
 ```
 
 ```{r funs}
-source('../R/Q_template.R')
-source('../R/getinfo.R')
+source('R/Q_template.R')
+source('R/getinfo.R')
 ```
 
 Now it will only show 'Running 240/240'...quiet?
@@ -48,15 +44,15 @@ for (i in 1:nrow(dd)) {
   cat(sprintf("\rRunning %d/%d", i, nrow(dd)))
   flush.console()
   res[[i]] <- do.call(sumfun, dd[i,])
-  saveRDS(res, file = "../data/multi1.rds")
+  saveRDS(res, file = "data/multi1.rds")
 }
 res <- do.call(rbind, res)
-saveRDS(res, file = "../data/multi1.rds")
+saveRDS(res, file = "data/multi1.rds")
 ```
 
 ```{r}
 ## exploring differences ...
-dd <- readRDS("../data/multi1.rds")
+dd <- readRDS("data/multi1.rds")
 if (!is.data.frame(dd)) dd <- as.data.frame(t(dd))
 
 with(dd, summary(as.numeric(RTMB_loglik)-as.numeric(orig_loglik)))
