@@ -28,8 +28,8 @@ set.seed(427)
 ```
 
 ```{r funs}
-source('R/Q_template.R')
-source('R/getinfo.R')
+source(here::here("R", "Q_template.R"))
+source(here::here("R", "getinfo.R"))
 ```
 
 Now it will only show 'Running 240/240'...quiet?
@@ -50,9 +50,9 @@ res <- do.call(rbind, res)
 saveRDS(res, file = "data/multi1.rds")
 ```
 
-```{r}
+```{r ddtest}
 ## exploring differences ...
-dd <- readRDS("data/multi1.rds")
+dd <- readRDS(here::here("data", "multi1.rds"))
 if (!is.data.frame(dd)) dd <- as.data.frame(t(dd))
 
 with(dd, summary(as.numeric(RTMB_loglik)-as.numeric(orig_loglik)))
