@@ -35,7 +35,3 @@ bestfit  <- function(dat, ..., rate.cat = 1, multistart = 10, jitter.sd = 0.25) 
   attr(best, "time") <- tt
   best
 }
-
-out <- simfun(ntrait = 2, ntaxa = 20, seed = 2)
-o1 <- bestfit(out)
-attr(o1, 'time')
