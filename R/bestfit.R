@@ -4,8 +4,8 @@ library(ape)
 library(expm)
 library(RTMB)
 
-source('R/Q_template.R')
-source('R/getinfo.R')
+source(here::here('R', 'Q_template.R'))
+source(here::here('R', 'getinfo.R'))
 
 bestfit  <- function(dat, ..., rate.cat = 1, multistart = 10, jitter.sd = 0.25) {
   tt <- system.time(

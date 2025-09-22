@@ -64,7 +64,6 @@ dd2 <- dd |>
 ## filter(dd2, ldiff<0) |> View()
 
 ggplot(dd2, aes(n, ldiff)) + geom_point()
-
 ```
 
 So, after multistart, RTMB will be better than orig?
