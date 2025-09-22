@@ -66,4 +66,4 @@ class(o1)
 
 dd <- readRDS(here::here('data', 'multi1.rds'))
 class(dd)
-[1] "matrix" "array" 
+## [1] "matrix" "array" 
