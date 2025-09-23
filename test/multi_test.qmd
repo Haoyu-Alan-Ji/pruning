@@ -44,10 +44,10 @@ for (i in 1:nrow(dd)) {
   cat(sprintf("\rRunning %d/%d", i, nrow(dd)))
   flush.console()
   res[[i]] <- do.call(sumfun, dd[i,])
-  saveRDS(res, file = "data/multi1.rds")
+  saveRDS(res, file = here::here('data', 'multi1.rds'))
 }
 res <- do.call(rbind, res)
-saveRDS(res, file = "data/multi1.rds")
+saveRDS(res, file = here::here('data', 'multi1.rds'))
 ```
 
 ```{r ddtest}
