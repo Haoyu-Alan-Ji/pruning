@@ -20,7 +20,7 @@ bestfit  <- function(dat, ..., rate.cat = 1, multistart = 10, jitter.sd = 0.25) 
       dat <- list(tree = dat$tree, data = dat$data, rate.mat = Q, p = p)
       
       invisible(capture.output(suppressWarnings(
-        x <- with(dat, corHMM(tree, data, rate.mat, p = p, rate.cat = rate.cat, ...)))))
+        x <- with(dat, corHMM(tree, data, rate.mat, p = p, rate.cat = rate.cat,  ...)))))
       jitter <- pmin(pmax(rnorm(multistart-1, mean = 0, sd = jitter.sd), 0), 1)
       loglik <- list()
       model <- list()
