@@ -110,3 +110,6 @@ attr(oo4, 'time')
   # 15.93    0.12   26.83 
 
 
+multistart = 14
+plan(cluster, workers = min(multistart - 1, parallel::detectCores() - 1))
+oo5 <- sumfun(seed = 105, ntrait = 3, ntaxa = 20, multistart = TRUE, try.times = multistart)

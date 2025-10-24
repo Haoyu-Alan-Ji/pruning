@@ -43,15 +43,15 @@ bestfit  <- function(dat, ..., rate.cat = 1, multistart = 10, jitter.sd = 0.25) 
 }
 
 sumfun <- function(ntrait = 2, ntaxa = 200, model = "ARD", multistart = FALSE, 
-                   try.times = 10, jitter.sd = 0.25, seed = NULL, ...) {
+                   try.times = 10, seed = NULL, ...) {
   if (!is.null(seed)) set.seed(seed)
   seed <- seed %||% NA
   ss <- simfun(ntrait = ntrait, ntaxa = ntaxa, seed = seed)
   if (multistart == TRUE) {
     fit_orig <- bestfit(ss, model = model, 
-                        multistart = try.times, jitter.sd = jitter.sd, ...)
+                        multistart = try.times,  ...)
     fit_RTMB <- bestfit(ss, use_RTMB = TRUE, model = model, 
-                        multistart = try.times, jitter.sd = jitter.sd, ...)
+                        multistart = try.times,  ...)
   } else {
     fit_orig <- fitfun(ss, model = model, ...)
     fit_RTMB <- fitfun(ss, use_RTMB = TRUE, model = model, ...)
@@ -67,8 +67,8 @@ sumfun <- function(ntrait = 2, ntaxa = 200, model = "ARD", multistart = FALSE,
   p_RTMB_rmse <- sqrt(mean((p_RTMB_trunc - ss$true_rates)^2))
   p_orig_rmse <- sqrt(mean((p_orig_trunc - ss$true_rates)^2))
   data.frame(seed, ntrait, ntaxa, model,
-             ## RTMB_opt.time = fit_RTMB$opt.time[["elapsed"]],
-             ## orig_opt.time = fit_orig$opt.time[["elapsed"]],
+             RTMB_opt.time = fit_RTMB$opt.time[["elapsed"]],
+             orig_opt.time = fit_orig$opt.time[["elapsed"]],
              RTMB_tot.time = attr(fit_RTMB, "time")[["elapsed"]],
              orig_tot.time = attr(fit_orig, "time")[["elapsed"]],
              RTMB_loglik = fit_RTMB$loglik,
