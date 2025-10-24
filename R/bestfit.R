@@ -108,3 +108,5 @@ oo4 <- bestfit(o1, use_RTMB = TRUE)
 attr(oo4, 'time')
   #  user  system elapsed 
   # 15.93    0.12   26.83 
+
+
