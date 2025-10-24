@@ -96,3 +96,15 @@ attr(oo2, 'time')
 
 #    user  system elapsed 
 #  314.14    4.66  319.63 
+
+plan(cluster, workers = min(multistart - 1, parallel::detectCores() - 1))
+oo3 <- bestfit(o1, use_RTMB = TRUE)
+attr(oo3, 'time')
+  #  user  system elapsed 
+  #  1.74    0.05   10.59 
+
+plan(sequential)
+oo4 <- bestfit(o1, use_RTMB = TRUE)
+attr(oo4, 'time')
+  #  user  system elapsed 
+  # 15.93    0.12   26.83 
