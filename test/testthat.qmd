@@ -155,13 +155,22 @@ bb <- benchmark(
 
 ```{r}
 set.seed(101)
-fitfun  <- function(dat, ..., rate.cat = 1) {
+options(corHMM.use_RTMB = TRUE)
+fitfun  <- function(dat, ..., rate.cat = 1, use_RTMB = getOption("corHMM.use_RTMB", FALSE)) {
+  use_RTMB <- isTRUE(use_RTMB)
   tt <- system.time(
     invisible(capture.output(x <- suppressWarnings(with(dat, corHMM(tree, data, rate.cat = rate.cat, ...)))))
   )
   attr(x, "time") <- tt
   x
 }
+
+out <- simfun(nstate = 2, ntrait = 2, ntaxa = 20, seed = 2, meanrate = 1)
+out3 <- simfun(nstate = 2, ntrait = 3, ntaxa = 20, seed = 55, meanrate = 1)
+o3 <- fitfun(out3)
+o1 <- fitfun(out, use_RTMB = FALSE)
+o1$loglik - oo$loglik
+
 parfun <- function(x) log(na.omit(c(x$solution)))
 
 sumfun <- function(ntrait = 2, ntaxa = 200, model = "ARD", seed = NULL, ...) {

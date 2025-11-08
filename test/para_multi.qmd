@@ -35,63 +35,11 @@ source(here::here("R", "Q_template.R"))
 source(here::here("R", "getinfo.R"))
 ```
 
-```{r best}
-bestfit  <- function(dat, ..., rate.cat = 1, multistart = 10) {
-
-  tt <- system.time({
-    dat <- list(tree = dat$tree, data = dat$data)
-
-    invisible(capture.output(suppressWarnings(
-      x <- with(dat, corHMM(tree, data, rate.cat = rate.cat, ...))
-    )))
-    
-    loglik <- list(); loglik[1] <- x$loglik
-    model <- list(); model[[1]] <- x
-
-    ## worker function
-    fitj <- function(i, dat, rate.cat, ...) {
-      s <- new("rstream.mrg32k3a",
-           seed = c(i, i+1, i+2, i+3, i+4, i+5),
-           force.seed = TRUE)
-      rstream.RNG(s)
-
-      cat("▶ Worker", i, "started on PID", Sys.getpid(), "\n")
-      flush.console()
-      
-      dat0 <- list(tree = dat$tree, data = dat$data)
-      invisible(capture.output(suppressWarnings(
-        y <- with(dat0, corHMM(tree, data, rate.cat = rate.cat, ...))
-      )))
-      return(list(loglik = y$loglik, model = y))
-    }
-    
-    parallel_out <- future_lapply(
-        1:(multistart - 1), \(i) fitj(i, dat, rate.cat, ...),
-        future.seed = TRUE
-      )
-
-      for (i in seq_along(parallel_out)) {
-        loglik[i + 1] <- parallel_out[[i]]$loglik
-        model[[i + 1]] <- parallel_out[[i]]$model
-
-      }
-    
-    best <- model[[which.max(loglik)]]
-  })
-    
-  attr(best, "time") <- tt
-  best
-}
-```
-
-```{r get_rds, eval=FALSE}
-ntaxvec <- round(exp(seq(log(20), log(1000), length.out = 15)))
-multistart = 10
-dd <- expand.grid(seed = 101:102, ntaxa = ntaxvec, ntrait = 2:3, model = c("ARD", "SYM"), 
-                  multistart = TRUE, try.times = multistart, rate.cat = 1) |>
+```{r 2trait, eval=FALSE}
+ntaxvec <- as.numeric(5:200)
+dd <- expand.grid(seed = 27, ntaxa = ntaxvec, ntrait = 2, model = c("ARD", "SYM"), rate.cat = 1) |>
   transform(model = as.character(model)) ## factor messes up do.call, converts to numeric
 
-plan(cluster, workers = min(multistart - 1, parallel::detectCores() - 1))
 res <- list()
 for (i in 1:nrow(dd)) {
   cat(sprintf("\rRunning %d/%d", i, nrow(dd)))
@@ -103,18 +51,119 @@ res <- do.call(rbind, res)
 saveRDS(res, file = here::here('data', 'para1.rds'))
 ```
 
-```{r ddtest}
+```{r trait2plot}
 ## exploring differences ...
 dd <- readRDS(here::here("data", "para1.rds"))
 if (!is.data.frame(dd)) dd <- as.data.frame(t(dd))
 
 with(dd, summary(as.numeric(RTMB_loglik)-as.numeric(orig_loglik)))
-dd2 <- dd |>
+dd_diff <- dd |>
   mutate(ldiff = as.numeric(RTMB_loglik)-as.numeric(orig_loglik)) |>
   arrange(ldiff) |>
   mutate(n = seq(n()))
 
 ## filter(dd2, ldiff<0) |> View()
 
-ggplot(dd2, aes(n, ldiff)) + geom_point()
+ggplot(dd_diff, aes(n, ldiff)) + geom_point()
+
+dd_ARD <- dd_diff |>
+  filter(model == 'ARD')
+ggplot(dd_ARD, aes(ntaxa, ldiff)) + geom_point()
+
+dd_SYM <- dd_diff |>
+  filter(model == 'SYM')
+ggplot(dd_SYM, aes(ntaxa, ldiff)) + geom_point()
+
+cneg <- dd_diff |> filter(ldiff < 0) |> slice_max(ldiff, n = 1, with_ties = FALSE)
+cpos <- dd_diff |> filter(ldiff > 0) |> slice_min(ldiff, n = 1, with_ties = FALSE)
+c(cneg$ntaxa, cpos$ntaxa)
+```
+
+
+```{r 3trait, eval=FALSE}
+ntaxvec <- as.numeric(20:200)
+dd <- expand.grid(seed = 27, ntaxa = ntaxvec, ntrait = 3, model = c("ARD", "SYM"), rate.cat = 1) |>
+  transform(model = as.character(model)) ## factor messes up do.call, converts to numeric
+
+res <- list()
+for (i in 1:nrow(dd)) {
+  cat(sprintf("\rRunning %d/%d", i, nrow(dd)))
+  flush.console()
+  res[[i]] <- do.call(sumfun, dd[i,])
+  saveRDS(res, file = here::here('data', 'trait3.rds'))
+}
+res <- do.call(rbind, res)
+saveRDS(res, file = here::here('data', 'trait3.rds'))
+```
+
+```{r trait3plot}
+## exploring differences ...
+dd <- readRDS(here::here("data", "trait3.rds"))
+if (!is.data.frame(dd)) dd <- as.data.frame(t(dd))
+
+with(dd, summary(as.numeric(RTMB_loglik)-as.numeric(orig_loglik)))
+dd_diff <- dd |>
+  mutate(ldiff = as.numeric(RTMB_loglik)-as.numeric(orig_loglik)) |>
+  arrange(ldiff) |>
+  mutate(n = seq(n()))
+
+## filter(dd2, ldiff<0) |> View()
+
+ggplot(dd_diff, aes(n, ldiff)) + geom_point()
+
+dd_ARD <- dd_diff |>
+  filter(model == 'ARD')
+ggplot(dd_ARD, aes(ntaxa, ldiff)) + geom_point()
+
+dd_SYM <- dd_diff |>
+  filter(model == 'SYM')
+ggplot(dd_SYM, aes(ntaxa, ldiff)) + geom_point()
+
+cneg <- dd_diff |> filter(ldiff < 0) |> slice_max(ldiff, n = 1, with_ties = FALSE)
+cpos <- dd_diff |> filter(ldiff > 0) |> slice_min(ldiff, n = 1, with_ties = FALSE)
+c(cneg$ntaxa, cpos$ntaxa)
+```
+
+```{r 4trait, eval=FALSE}
+ntaxvec <- as.numeric(35:100)
+dd <- expand.grid(seed = 27, ntaxa = ntaxvec, ntrait = 4, model = c("ARD", "SYM"), rate.cat = 1) |>
+  transform(model = as.character(model)) ## factor messes up do.call, converts to numeric
+
+res <- list()
+for (i in 1:nrow(dd)) {
+  cat(sprintf("\rRunning %d/%d", i, nrow(dd)))
+  flush.console()
+  res[[i]] <- do.call(sumfun, dd[i,])
+  saveRDS(res, file = here::here('data', 'trait4.rds'))
+}
+res <- do.call(rbind, res)
+saveRDS(res, file = here::here('data', 'trait4.rds'))
+```
+
+```{r trait4plot}
+## exploring differences ...
+dd <- readRDS(here::here("data", "trait4.rds"))
+if (!is.data.frame(dd)) dd <- as.data.frame(t(dd))
+
+with(dd, summary(as.numeric(RTMB_loglik)-as.numeric(orig_loglik)))
+dd_diff <- dd |>
+  mutate(ldiff = as.numeric(RTMB_loglik)-as.numeric(orig_loglik)) |>
+  arrange(ldiff) |>
+  mutate(n = seq(n()))
+
+## filter(dd2, ldiff<0) |> View()
+
+ggplot(dd_diff, aes(n, ldiff)) + geom_point()
+
+dd_ARD <- dd_diff |>
+  filter(model == 'ARD')
+ggplot(dd_ARD, aes(ntaxa, ldiff)) + geom_point()
+
+dd_SYM <- dd_diff |>
+  filter(model == 'SYM')
+ggplot(dd_SYM, aes(ntaxa, ldiff)) + geom_point()
+
+cneg <- dd_diff |> filter(ldiff < 0) |> slice_max(ldiff, n = 1, with_ties = FALSE)
+cpos <- dd_diff |> filter(ldiff > 0) |> slice_min(ldiff, n = 1, with_ties = FALSE)
+c(cneg$ntaxa, cpos$ntaxa)
 ```
