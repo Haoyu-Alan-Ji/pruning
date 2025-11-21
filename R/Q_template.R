@@ -40,7 +40,7 @@ to_bin <- function(x, n = 2) {
 ##' @examples
 ##' simfun(ntaxa = 8)
 simfun <- function(nstate = 2, ntrait = 2, ntaxa = 20, seed = NULL,
-                   meanrate = 1, seql = 1, collapse_allow = FALSE) {
+                   meanrate = 1, seql = 1, collapse = FALSE) {
   if (nstate!=2) stop("oops, simSeq to trait matrix not implemented for nstate!=2, 
                       to_bin's binary algorithm determines that the state can only be 2")
   if (!is.null(seed)) set.seed(seed)
@@ -56,7 +56,7 @@ simfun <- function(nstate = 2, ntrait = 2, ntaxa = 20, seed = NULL,
   s <- phangorn::simSeq(phy, l = seql, Q = Q,
                         type = "USER", levels = seq(nstate^ntrait),
                         rate = 1)
-  if (collapse_allow == FALSE) {
+  if (collapse == FALSE) {
     repeat {
       s <- phangorn::simSeq(phy, l = seql, Q = Q,
                             type = "USER", levels = seq(nstate^ntrait),
@@ -71,3 +71,23 @@ simfun <- function(nstate = 2, ntrait = 2, ntaxa = 20, seed = NULL,
   
   list(tree = phy, data = traitMatrix)
 }
+
+realfun <- function(tree) {
+  trait_number = ncol(tree$edge) + 1
+  ss <- function(n) {
+    sample(0:(n - 1), size = Ntip(tree), replace = TRUE)
+  }
+  repeat {
+    d <- list()
+    for (i in seq_along(trait_number)) {
+      d[[i]] <- ss(trait_number[i])
+    }
+    d <- as.data.frame(d)
+    names(d) <- paste0("trait", seq_along(trait_number))
+    if (nrow(unique(d)) == prod(trait_number)) break
+  }
+  d <- cbind(tree$tip.label, d)
+  return(d)
+}
+
+o1 <- realfun(fish_tree)

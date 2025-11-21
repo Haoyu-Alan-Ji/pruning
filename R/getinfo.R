@@ -1,7 +1,7 @@
 library(corHMM)
 library(rbenchmark)
 
-parfun <- function(x) log(na.omit(c(x$solution)))
+# parfun <- function(x) log(na.omit(c(x$solution)))
 
 fitfun  <- function(dat, ..., rate.cat = 1) {
   tt <- system.time(
@@ -11,8 +11,7 @@ fitfun  <- function(dat, ..., rate.cat = 1) {
   x
 }
 
-sumfun <- function(ntrait = 2, ntaxa = 200, model = "ARD", multistart = FALSE, 
-                   try.times = 10, seed = NULL, ...) {
+sumfun <- function(ntrait = 2, ntaxa = 200, model = "ARD", seed = NULL, ...) {
   if (!is.null(seed)) set.seed(seed)
   seed <- seed %||% NA
   ss <- simfun(ntrait = ntrait, ntaxa = ntaxa, seed = seed)

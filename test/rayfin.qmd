@@ -1,0 +1,73 @@
+---
+title: "parametric bootstrap in real data"
+author: "Haoyu Ji"
+format: 
+  html:
+    self-contained: true
+date: today
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(here)
+setwd(here::here())
+```
+
+```{r pkgs, message = FALSE, warning=FALSE}
+## https://github.com/bbolker/corHMM/blob/bolker_clean/misc/test_RTMB.R
+## remotes::install_github("bbolker/corHMM", ref = "bolker_clean")
+library(Matrix)
+library(ape)
+library(tidyverse); theme_set(theme_bw())
+library(expm)
+library(RTMB)
+```
+
+```{r seed}
+set.seed(427)
+```
+
+```{r funs}
+source(here::here("R", "Q_template.R"))
+source(here::here("R", "getinfo.R"))
+```
+
+```{r realdat}
+fish_traits <- read.csv(here::here('data', "binaryTraitData.csv"))
+fish_tree   <- readRDS(here::here('data', "treeSingle.rds"))
+```
+
+```{r}
+simfun(ntaxa = 8)
+```
+
+
+```{r clean}
+only_in_traits <- setdiff(fish_traits$species, fish_tree$tip.label)
+only_in_tree   <- setdiff(fish_tree$tip.label, fish_traits$species)
+
+length(only_in_traits)
+length(only_in_tree)
+
+
+ctraits <- fish_traits[fish_traits$species %in% fish_tree$tip.label, ]
+
+ctraits <- fish_traits_sub[match(fish_tree$tip.label, fish_traits_sub$species), ]
+
+c_traits <- data.frame(
+  Species = ctraits$species,
+  ag = ctraits$ag,
+  mating = ctraits$mating,
+  care = ctraits$care,
+  spawning = ctraits$spawning,
+  pairs.groups = ctraits$pairs.groups,
+  pairs.arts = ctraits$pairs.arts
+)
+
+all(fish_tree$tip.label == fish_traits_sub$species)
+```
+
+
+```{r}
+base <- corHMM::corHMM(phy = fish_tree, data = c_traits, rate.cat = 1)
+```
