@@ -11,10 +11,17 @@ fitfun  <- function(dat, ..., rate.cat = 1) {
   x
 }
 
-sumfun <- function(ntrait = 2, ntaxa = 200, model = "ARD", seed = NULL, ...) {
+sumfun <- function(ntrait = 2, ntaxa = 200, model = "ARD", seed = NULL,
+                    traitMatrix = NULL, realtree = NULL, ...) {
   if (!is.null(seed)) set.seed(seed)
   seed <- seed %||% NA
+  if (!is.null(traitMatrix) && !is.null(tree)) {
+  ss <- realfun(raw_traitM = traitMatrix,
+                raw_tree = realtree) 
+} else {
   ss <- simfun(ntrait = ntrait, ntaxa = ntaxa, seed = seed)
+}
+
   fit_orig <- fitfun(ss, model = model, ...)
   fit_RTMB <- fitfun(ss, use_RTMB = TRUE, model = model, ...)
   
@@ -26,8 +33,13 @@ sumfun <- function(ntrait = 2, ntaxa = 200, model = "ARD", seed = NULL, ...) {
   p_RTMB_trunc <- pmax(p_RTMB, -10)
   p_diff_trunc <- p_orig_trunc - p_RTMB_trunc
   ## get RMSE vs true rates on truncated scale ...
-  p_RTMB_rmse <- sqrt(mean((p_RTMB_trunc - ss$true_rates)^2))
-  p_orig_rmse <- sqrt(mean((p_orig_trunc - ss$true_rates)^2))
+  if (!is.null(ss$true_rates)) {
+    p_RTMB_rmse <- sqrt(mean((p_RTMB_trunc - ss$true_rates)^2))
+    p_orig_rmse <- sqrt(mean((p_orig_trunc - ss$true_rates)^2))
+  } else {
+    p_RTMB_rmse <- NA
+    p_orig_rmse <- NA
+  }
   data.frame(seed, ntrait, ntaxa, model,
              RTMB_opt.time = fit_RTMB$opt.time[["elapsed"]],
              orig_opt.time = fit_orig$opt.time[["elapsed"]],

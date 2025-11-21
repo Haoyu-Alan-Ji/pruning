@@ -52,22 +52,23 @@ length(only_in_tree)
 
 ctraits <- fish_traits[fish_traits$species %in% fish_tree$tip.label, ]
 
-ctraits <- fish_traits_sub[match(fish_tree$tip.label, fish_traits_sub$species), ]
+ctraits <- ctraits[match(fish_tree$tip.label, ctraits$species), ]
 
 c_traits <- data.frame(
   Species = ctraits$species,
   ag = ctraits$ag,
-  mating = ctraits$mating,
-  care = ctraits$care,
-  spawning = ctraits$spawning,
-  pairs.groups = ctraits$pairs.groups,
-  pairs.arts = ctraits$pairs.arts
+  mating = ctraits$mating
 )
 
-all(fish_tree$tip.label == fish_traits_sub$species)
+c_traits <- c_traits[!is.na(c_traits$mating), ]
+c_tree <- drop.tip(fish_tree, setdiff(fish_tree$tip.label, c_traits$Species))
+
+c_traits <- c_traits[match(fish_tree_sub$tip.label, c_traits$Species), ]
+stopifnot(all(c_tree$tip.label == c_traits$Species))
 ```
 
 
 ```{r}
-base <- corHMM::corHMM(phy = fish_tree, data = c_traits, rate.cat = 1)
+base_orig <- corHMM(phy = c_tree, data = c_traits, rate.cat = 1)
+base_RTMB <- corHMM(phy = c_tree, data = c_traits, rate.cat = 1, use_RTMB = TRUE)
 ```
