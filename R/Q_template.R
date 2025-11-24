@@ -92,4 +92,4 @@ realfun <- function(nstate = 2, raw_traitM, raw_tree) {
   return(d)
 }
 
-o1 <- realfun(raw_traitM = c_traits, raw_tree = c_tree)
+# o1 <- realfun(raw_traitM = c_traits, raw_tree = c_tree)

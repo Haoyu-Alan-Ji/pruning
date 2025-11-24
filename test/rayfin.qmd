@@ -63,12 +63,15 @@ c_traits <- data.frame(
 c_traits <- c_traits[!is.na(c_traits$mating), ]
 c_tree <- drop.tip(fish_tree, setdiff(fish_tree$tip.label, c_traits$Species))
 
-c_traits <- c_traits[match(fish_tree_sub$tip.label, c_traits$Species), ]
-stopifnot(all(c_tree$tip.label == c_traits$Species))
+c_traits <- c_traits[match(c_tree$tip.label, c_traits$Species), ]
 ```
 
 
 ```{r}
 base_orig <- corHMM(phy = c_tree, data = c_traits, rate.cat = 1)
 base_RTMB <- corHMM(phy = c_tree, data = c_traits, rate.cat = 1, use_RTMB = TRUE)
+```
+
+```{r}
+
 ```
