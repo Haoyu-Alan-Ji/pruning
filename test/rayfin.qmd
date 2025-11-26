@@ -42,14 +42,7 @@ simfun(ntaxa = 8)
 ```
 
 
-```{r clean}
-only_in_traits <- setdiff(fish_traits$species, fish_tree$tip.label)
-only_in_tree   <- setdiff(fish_tree$tip.label, fish_traits$species)
-
-length(only_in_traits)
-length(only_in_tree)
-
-
+```{r clean43traits}
 ctraits <- fish_traits[fish_traits$species %in% fish_tree$tip.label, ]
 
 ctraits <- ctraits[match(fish_tree$tip.label, ctraits$species), ]
@@ -57,10 +50,11 @@ ctraits <- ctraits[match(fish_tree$tip.label, ctraits$species), ]
 c_traits <- data.frame(
   Species = ctraits$species,
   ag = ctraits$ag,
-  mating = ctraits$mating
+  care = ctraits$care,
+  spawning = ctraits$spawning
 )
 
-c_traits <- c_traits[!is.na(c_traits$mating), ]
+c_traits <- c_traits[!is.na(c_traits$care) & !is.na(c_traits$spawning), ]
 c_tree <- drop.tip(fish_tree, setdiff(fish_tree$tip.label, c_traits$Species))
 
 c_traits <- c_traits[match(c_tree$tip.label, c_traits$Species), ]
@@ -71,6 +65,37 @@ c_traits <- c_traits[match(c_tree$tip.label, c_traits$Species), ]
 base_orig <- corHMM(phy = c_tree, data = c_traits, rate.cat = 1)
 base_RTMB <- corHMM(phy = c_tree, data = c_traits, rate.cat = 1, use_RTMB = TRUE)
 ```
+
+```{r}
+sample_subtree <- function(tree, traits, ntaxa) {
+  
+  if (ntaxa > Ntip(tree)) {
+    stop("ntaxa is greater than nodes")
+  }
+  
+  keep_tips <- sample(tree$tip.label, ntaxa)
+  
+  sub_tree <- drop.tip(tree, setdiff(tree$tip.label, keep_tips))
+  
+  sub_traits <- traits[traits$Species %in% sub_tree$tip.label, ]
+  sub_traits <- sub_traits[match(sub_tree$tip.label, sub_traits$Species), ]
+  
+  stopifnot(all(sub_tree$tip.label == sub_traits$Species))
+  
+  list(tree = sub_tree, traits = sub_traits)
+}
+```
+
+
+```{r}
+o1 <- sample_subtree(c_tree, c_traits, 50)
+```
+
+```{r}
+base_orig <- corHMM(phy = o1$tree, data = o1$traits, rate.cat = 1)
+base_RTMB <- corHMM(phy = o1$tree, data = o1$traits, rate.cat = 1, use_RTMB = TRUE)
+```
+
 
 ```{r}
 
