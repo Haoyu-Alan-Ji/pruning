@@ -1,7 +1,7 @@
 library(corHMM)
 library(rbenchmark)
 
-# parfun <- function(x) log(na.omit(c(x$solution)))
+parfun <- function(x) log(na.omit(c(x$solution)))
 
 fitfun  <- function(dat, ..., rate.cat = 1) {
   tt <- system.time(
@@ -15,7 +15,7 @@ sumfun <- function(ntrait = 2, ntaxa = 200, model = "ARD", seed = NULL,
                     traitMatrix = NULL, realtree = NULL, ...) {
   if (!is.null(seed)) set.seed(seed)
   seed <- seed %||% NA
-  if (!is.null(traitMatrix) && !is.null(tree)) {
+  if (!is.null(traitMatrix) && !is.null(realtree)) {
   ss <- realfun(raw_traitM = traitMatrix,
                 raw_tree = realtree) 
 } else {

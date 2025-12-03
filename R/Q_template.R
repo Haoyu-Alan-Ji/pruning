@@ -72,24 +72,4 @@ simfun <- function(nstate = 2, ntrait = 2, ntaxa = 20, seed = NULL,
   list(tree = phy, data = traitMatrix)
 }
 
-realfun <- function(nstate = 2, raw_traitM, raw_tree) {
-  trait_number = ncol(raw_traitM) - 1
-  trait <- (1:trait_number)
-  state <- (1:nstate)
-  ss <- function(n) {
-    sample(0:(n - 1), size = Ntip(raw_tree), replace = TRUE)
-  }
-  repeat {
-    d <- list()
-    for (i in (1: trait_number)) {
-      d[[i]] <- ss(state[i])
-    }
-    d <- as.data.frame(d)
-    names(d) <- paste0("trait", seq_along(trait))
-    if (nrow(unique(d)) == prod(state)) break
-  }
-  d <- cbind(raw_tree$tip.label, d)
-  return(d)
-}
 
-# o1 <- realfun(raw_traitM = c_traits, raw_tree = c_tree)

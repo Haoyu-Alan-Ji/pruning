@@ -13,7 +13,7 @@ library(here)
 setwd(here::here())
 ```
 
-```{r pkgs, message = FALSE, warning=FALSE}
+```{r pkgs, include=FALSE, message = FALSE, warning=FALSE}
 ## https://github.com/bbolker/corHMM/blob/bolker_clean/misc/test_RTMB.R
 ## remotes::install_github("bbolker/corHMM", ref = "bolker_clean")
 library(Matrix)
@@ -27,9 +27,10 @@ library(RTMB)
 set.seed(427)
 ```
 
-```{r funs}
+```{r funs, message = FALSE, warning=FALSE}
 source(here::here("R", "Q_template.R"))
 source(here::here("R", "getinfo.R"))
+source(here::here("R", "realtree.R"))
 ```
 
 ```{r realdat}
@@ -37,12 +38,7 @@ fish_traits <- read.csv(here::here('data', "binaryTraitData.csv"))
 fish_tree   <- readRDS(here::here('data', "treeSingle.rds"))
 ```
 
-```{r}
-simfun(ntaxa = 8)
-```
-
-
-```{r clean43traits}
+```{r clean3traits}
 ctraits <- fish_traits[fish_traits$species %in% fish_tree$tip.label, ]
 
 ctraits <- ctraits[match(fish_tree$tip.label, ctraits$species), ]
@@ -60,43 +56,202 @@ c_tree <- drop.tip(fish_tree, setdiff(fish_tree$tip.label, c_traits$Species))
 c_traits <- c_traits[match(c_tree$tip.label, c_traits$Species), ]
 ```
 
+```{r getdat, eval = FALSE}
+ntaxvec <- as.numeric(45:234)
 
-```{r}
-base_orig <- corHMM(phy = c_tree, data = c_traits, rate.cat = 1)
-base_RTMB <- corHMM(phy = c_tree, data = c_traits, rate.cat = 1, use_RTMB = TRUE)
-```
+dd <- expand.grid(seed = 101:104, ntaxa  = ntaxvec, ntrait = 3, model = "ARD", rate.cat = 1) |>
+  transform(model = as.character(model))
 
-```{r}
-sample_subtree <- function(tree, traits, ntaxa) {
-  
-  if (ntaxa > Ntip(tree)) {
-    stop("ntaxa is greater than nodes")
-  }
-  
-  keep_tips <- sample(tree$tip.label, ntaxa)
-  
-  sub_tree <- drop.tip(tree, setdiff(tree$tip.label, keep_tips))
-  
-  sub_traits <- traits[traits$Species %in% sub_tree$tip.label, ]
-  sub_traits <- sub_traits[match(sub_tree$tip.label, sub_traits$Species), ]
-  
-  stopifnot(all(sub_tree$tip.label == sub_traits$Species))
-  
-  list(tree = sub_tree, traits = sub_traits)
+res <- list()
+
+for (i in seq_len(nrow(dd))) {
+  cat(sprintf("\rRunning %d/%d", i, nrow(dd)))
+  flush.console()
+
+  ntaxa_i <- dd$ntaxa[i]
+  sub <- sample_subtree(tree = c_tree, traits = c_traits, ntaxa  = ntaxa_i)
+
+  args_i <- c(
+    as.list(dd[i, ]),   
+    list(
+      traitMatrix = sub$traits, 
+      realtree = sub$tree 
+    )
+  )
+
+  res[[i]] <- do.call(sumfun, args_i)
 }
+
+res_df <- do.call(rbind, res)
+saveRDS(res_df, file = here::here("data", "trait3_subtree.rds"))
 ```
 
 
-```{r}
-o1 <- sample_subtree(c_tree, c_traits, 50)
+```{r dat}
+dd <- readRDS(here::here("data", "trait3_subtree.rds"))
+if (!is.data.frame(dd)) dd <- as.data.frame(t(dd))
 ```
 
-```{r}
-base_orig <- corHMM(phy = o1$tree, data = o1$traits, rate.cat = 1)
-base_RTMB <- corHMM(phy = o1$tree, data = o1$traits, rate.cat = 1, use_RTMB = TRUE)
+```{r loglik}
+dd$ldiff <- dd$RTMB_loglik - dd$orig_loglik
+
+dd$ntaxa_bin <- cut(
+  dd$ntaxa,
+  breaks = c(0, 60, 100, 150, 250),
+  labels = c("≤60", "61–100", "101–150", "151+")
+)
+
+ggplot(dd, aes(x = ntaxa_bin, y = ldiff, fill = model)) +
+  geom_boxplot() +
+  geom_hline(yintercept = 0, linetype = "dashed") +
+  labs(
+    x = "Number of taxa (binned)",
+    y = "RTMB_loglik - orig_loglik",
+    fill = "Model"
+  ) +
+  theme_minimal()
+
 ```
 
 
-```{r}
+```{r ddtb}
+ddtb <- dd |>
+  mutate(
+    bad = case_when(
+      is.na(ldiff) ~ NA_character_,
+      abs(ldiff) < 1e-6 ~ "OK",  
+      ldiff < 0 ~ "RTMB",  
+      TRUE ~ "orig"  
+    ),
+    bad = factor(bad, levels = c("OK", "orig", "RTMB"))
+  ) |>
+  transmute(
+    seed, ntaxa, ntrait, model,
+    ldiff, bad,
+    opt_RTMB = RTMB_opt.time,
+    opt_orig = orig_opt.time,
+    tot_RTMB = RTMB_tot.time,
+    tot_orig = orig_tot.time
+  ) |>
+  pivot_longer(
+    cols = c(opt_RTMB, opt_orig, tot_RTMB, tot_orig),
+    names_to   = c("type", "method"),
+    names_pattern = "(opt|tot)_(RTMB|orig)",
+    values_to  = "value"
+  )
 
+ddtb <- ddtb |>
+  mutate(
+    type   = factor(type,   levels = c("opt", "tot")),
+    method = factor(method, levels = c("orig", "RTMB"))
+  )
+```
+
+
+```{r opt, message = FALSE, warning=FALSE}
+ggplot(
+  filter(ddtb, type == "opt", method == "RTMB"),
+  aes(x = ntaxa, y = value)
+) +
+  geom_point(aes(colour = bad, size = abs(ldiff))) +
+  scale_x_log10() +
+  scale_y_log10() +
+  scale_colour_manual(
+    values = c(
+      "OK"   = adjustcolor("grey", alpha.f = 0.2), 
+      "orig" = "#377EB8",  
+      "RTMB" = "#E41A1C" 
+    ),
+    na.value = "black"
+  ) +
+  scale_size(range = c(0.5, 3), guide = "none") +
+  labs(
+    x = "Number of taxa",
+    y = "time (s) for RTMB (opt)",
+    colour = "bad"
+  ) +
+  theme_minimal()
+```
+
+```{r tot, message = FALSE, warning=FALSE}
+ggplot(
+  filter(ddtb, type == "tot", method == "RTMB"),
+  aes(x = ntaxa, y = value)
+) +
+  geom_point(aes(colour = bad, size = abs(ldiff))) +
+  scale_x_log10() +
+  scale_y_log10() +
+  scale_colour_manual(
+    values = c(
+      "OK"   = adjustcolor("grey", alpha.f = 0.2), 
+      "orig" = "#377EB8",  
+      "RTMB" = "#E41A1C" 
+    ),
+    na.value = "black"
+  ) +
+  scale_size(range = c(0.5, 3), guide = "none") +
+  labs(
+    x = "Number of taxa",
+    y = "time (s) for RTMB (tot)",
+    colour = "bad"
+  ) +
+  theme_minimal()
+```
+
+```{r together, message = FALSE, warning=FALSE}
+ggplot(ddtb, aes(x = ntaxa, y = value, colour = method)) +
+  geom_point(alpha = 0.5, aes(shape = factor(ntrait))) +
+  scale_x_log10() +
+  scale_y_log10() +
+  facet_wrap(~ type, scales = "free_y") +
+  geom_smooth(
+    aes(linetype = factor(ntrait)),
+    method = "lm",  
+    se = FALSE,
+    size = 0.8
+  ) +
+  labs(
+    x = "Number of taxa",
+    y = "time (s)",
+    colour   = "method",
+    shape    = "ntrait",
+    linetype = "ntrait"
+  ) +
+  theme_minimal()
+
+```
+
+```{r prop, message = FALSE, warning=FALSE}
+dd$speedup_tot  <- dd$orig_tot.time / dd$RTMB_tot.time
+dd$speedup_opt  <- dd$orig_opt.time / dd$RTMB_opt.time
+
+speed_sum <- dd |> 
+  group_by(ntaxa, model) |>
+  summarise(
+    med_speedup_tot = median(speedup_tot, na.rm = TRUE),
+    med_speedup_opt = median(speedup_opt, na.rm = TRUE),
+    .groups = "drop"
+  ) |>
+  pivot_longer(
+    cols = starts_with("med_speedup_"),
+    names_to = "type",
+    values_to = "med_speedup"
+  )
+
+ggplot(speed_sum, aes(x = ntaxa, y = med_speedup, colour = model)) +
+  geom_line() +
+  geom_point() +
+  geom_smooth(
+    aes(group = 1, colour = NULL), 
+    method = "loess",
+    se = FALSE,
+    linetype = "dashed"
+  ) +
+  facet_wrap(~ type, scales = "free_y") +
+  labs(
+    x = "Number of taxa",
+    y = "Median speedup (orig / RTMB)",
+    colour = "Model"
+  ) +
+  theme_minimal()
 ```
