@@ -13,19 +13,63 @@ bibliography: ../pre.bib
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = FALSE)
-library(tidytuesdayR)
-library(tidyverse)
-library(scales)
+library(Matrix)
+library(ape)
+library(tidyverse); theme_set(theme_bw())
+library(expm)
+library(RTMB)
 ```
 
 # Preparation Instructions
 
-- Be sure to change the author in the YAML to your name. Remember to keep it inside the quotes.
+```{r seed}
+set.seed(427)
+```
 
-- There is less hand-holding in this assignment.
-    - The packages that need to be loaded will no longer be provided in the setup code chunk. You are responsible for loading the appropriate packages for the assignment.
-    - Questions on examining the data will no longer be provided. You are responsible for getting a sense of the data prior to completing the analyses. 
-    
-- **This assignment will be submitted as 2 documents:**
-    1) **Slidy slides** - this will help prepare you for the final project.
-    2) **Original R Markdown document** (so we can see your code; I don't believe there is a code download option for Slidy)
+```{r funs, message = FALSE, warning=FALSE}
+source(here::here("R", "Q_template.R"))
+source(here::here("R", "getinfo.R"))
+source(here::here("R", "realtree.R"))
+```
+
+```{r realdat}
+fish_traits <- read.csv(here::here('data', "binaryTraitData.csv"))
+fish_tree   <- readRDS(here::here('data', "treeSingle.rds"))
+```
+
+```{r clean3traits}
+ctraits <- fish_traits[fish_traits$species %in% fish_tree$tip.label, ]
+
+ctraits <- ctraits[match(fish_tree$tip.label, ctraits$species), ]
+
+c_traits <- data.frame(
+  Species = ctraits$species,
+  ag = ctraits$ag,
+  care = ctraits$care,
+  spawning = ctraits$spawning
+)
+
+c_traits <- c_traits[!is.na(c_traits$care) & !is.na(c_traits$spawning), ]
+c_tree <- drop.tip(fish_tree, setdiff(fish_tree$tip.label, c_traits$Species))
+
+c_traits <- c_traits[match(c_tree$tip.label, c_traits$Species), ]
+```
+
+```{r}
+tax_plot <- ctraits |>
+  distinct(order, species) |>           # 每个物种只算一次
+  group_by(order) |>
+  mutate(spec_index = row_number()) |>  # 在每个 order 内给物种一个编号
+  ungroup()
+
+ggplot(tax_plot, aes(x = spec_index, y = reorder(order, spec_index, max))) +
+  geom_point(alpha = 0.5, size = 0.3) +
+  labs(
+    x = "Species index within order",
+    y = "Order (ordered by #species)",
+    title = "Distribution of species across orders"
+  ) +
+  theme_minimal()
+
+```
+
