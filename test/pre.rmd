@@ -1,0 +1,31 @@
+---
+title: "pre"
+author: "Haoyu Ji"
+institute: Department of Biostatistics, University of Minnesota
+date: "`r Sys.Date()`"
+output:
+  slidy_presentation:
+      self_contained: true 
+      font_adjustment: -1
+      slide_level: 1
+bibliography: ../pre.bib 
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+library(tidytuesdayR)
+library(tidyverse)
+library(scales)
+```
+
+# Preparation Instructions
+
+- Be sure to change the author in the YAML to your name. Remember to keep it inside the quotes.
+
+- There is less hand-holding in this assignment.
+    - The packages that need to be loaded will no longer be provided in the setup code chunk. You are responsible for loading the appropriate packages for the assignment.
+    - Questions on examining the data will no longer be provided. You are responsible for getting a sense of the data prior to completing the analyses. 
+    
+- **This assignment will be submitted as 2 documents:**
+    1) **Slidy slides** - this will help prepare you for the final project.
+    2) **Original R Markdown document** (so we can see your code; I don't believe there is a code download option for Slidy)
