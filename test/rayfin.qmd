@@ -4,6 +4,9 @@ author: "Haoyu Ji"
 format: 
   html:
     self-contained: true
+    code-fold: true
+bibliography: ../pruning.bib
+csl: ../reflist2.csl
 date: today
 ---
 
@@ -23,16 +26,22 @@ library(expm)
 library(RTMB)
 ```
 
-```{r seed}
+```{r seed, include=FALSE}
 set.seed(427)
 ```
 
 ```{r funs, message = FALSE, warning=FALSE}
+#| code-fold: false
 source(here::here("R", "Q_template.R"))
 source(here::here("R", "getinfo.R"))
 source(here::here("R", "realtree.R"))
 ```
 
+- In Q_template.R, Q_template can be used to generate transit matrix Q, simfun can output trees of arbitrary length and specify the desired trait matrix for generation (currently only supports binary strates).
+- In getinfo.R, sumfun can run corHMM quietly, allowing you to choose between using RTMB or the original version, and extract information (computation time, log-likelihood, and predicted values, etc.).
+- RealTree.R provides a method for conducting large-scale benchmarking by sampling from real-world datasets.
+
+The dataset is from @eckert_parental_nodate
 ```{r realdat}
 fish_traits <- read.csv(here::here('data', "binaryTraitData.csv"))
 fish_tree   <- readRDS(here::here('data', "treeSingle.rds"))

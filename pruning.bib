@@ -1,21 +1,3 @@
-@article{korhonenFast2022,
-  title = {Fast and Universal Estimation of Latent Variable Models Using Extended Variational Approximations},
-  author = {Korhonen, Pekka and Hui, Francis K. C. and Niku, Jenni and Taskinen, Sara},
-  year = {2022},
-  month = dec,
-  journal = {Statistics and Computing},
-  volume = {33},
-  number = {1},
-  pages = {26},
-  issn = {1573-1375},
-  doi = {10.1007/s11222-022-10189-w},
-  urldate = {2024-06-21},
-  abstract = {Generalized linear latent variable models (GLLVMs) are a class of methods for analyzing multi-response data which has gained considerable popularity in recent years, e.g., in the analysis of multivariate abundance data in ecology. One of the main features of GLLVMs is their capacity to handle a variety of responses types, such as (overdispersed) counts, binomial and (semi-)continuous responses, and proportions data. On the other hand, the inclusion of unobserved latent variables poses a major computational challenge, as the resulting marginal likelihood function involves an intractable integral for non-normally distributed responses. This has spurred research into a number of approximation methods to overcome this integral, with a recent and particularly computationally scalable one being that of variational approximations (VA). However, research into the use of VA for GLLVMs has been hampered by the fact that fully closed-form variational lower bounds have only been obtained for certain combinations of response distributions and link functions. In this article, we propose an extended variational approximations (EVA) approach which widens the set of VA-applicable GLLVMs dramatically. EVA draws inspiration from the underlying idea behind the Laplace approximation: by replacing the complete-data likelihood function with its second order Taylor approximation about the mean of the variational distribution, we can obtain a fully closed-form approximation to the marginal likelihood of the GLLVM for any response type and link function. Through simulation studies and an application to a species community of testate amoebae, we demonstrate how EVA results in a ``universal'' approach to fitting GLLVMs, which remains competitive in terms of estimation and inferential performance relative to both standard VA (where any intractable integrals are either overcome through reparametrization or quadrature) and a Laplace approximation approach, while being computationally more scalable than both methods in practice.},
-  langid = {english},
-  keywords = {Generalized linear latent variable models,Laplace approximation,Multi-response data,Multivariate abundance data,Ordination,Variational approximations},
-  file = {/home/bolker/Documents/zotero_new/storage/G6UDW22E/Korhonen et al. - 2022 - Fast and universal estimation of latent variable m.pdf}
-}
-
 @article{nikuEfficient2019,
   title = {Efficient Estimation of Generalized Linear Latent Variable Models},
   author = {Niku, Jenni and Brooks, Wesley and Herliansyah, Riki and Hui, Francis K. C. and Taskinen, Sara and Warton, David I.},
@@ -33,85 +15,6 @@
   langid = {english},
   keywords = {Algorithms,Amoebas,Approximation methods,Binomials,Birds,Optimization,Simulation and modeling,Statistical models},
   file = {/home/bolker/Documents/zotero_new/storage/BVGIZRZD/Niku et al. - 2019 - Efficient estimation of generalized linear latent .pdf}
-}
-
-@article{nikugllvm2019,
-  title = {Gllvm: {{Fast}} Analysis of Multivariate Abundance Data with Generalized Linear Latent Variable Models in {{R}}},
-  shorttitle = {Gllvm},
-  author = {Niku, Jenni and Hui, Francis K. C. and Taskinen, Sara and Warton, David I.},
-  year = {2019},
-  journal = {Methods in Ecology and Evolution},
-  volume = {10},
-  number = {12},
-  pages = {2173--2182},
-  issn = {2041-210X},
-  doi = {10.1111/2041-210X.13303},
-  urldate = {2021-03-17},
-  abstract = {There has been rapid development in tools for multivariate analysis based on fully specified statistical models or `joint models'. One approach attracting a lot of attention is generalized linear latent variable models (GLLVMs). However, software for fitting these models is typically slow and not practical for large datasets. The r package gllvm offers relatively fast methods to fit GLLVMs via maximum likelihood, along with tools for model checking, visualization and inference. The main advantage of the package over other implementations is speed, for example, being two orders of magnitude faster, and capable of handling thousands of response variables. These advances come from using variational approximations to simplify the likelihood expression to be maximized, automatic differentiation software for model-fitting (via the TMB package) and careful choice of initial values for parameters. Examples are used to illustrate the main features and functionality of the package, such as constrained or unconstrained ordination, including functional traits in `fourth corner' models, and (if the number of environmental coefficients is not large) make inferences about environmental associations.},
-  copyright = {{\copyright} 2019 The Authors. Methods in Ecology and Evolution {\copyright} 2019 British Ecological Society},
-  langid = {english},
-  keywords = {abundance data,generalized linear latent variable models,high-dimensional data,joint modelling,maximum likelihood,multivariate analysis,ordination,species interactions},
-  file = {/home/bolker/Documents/zotero_new/storage/GRSKS7N7/Niku et al. - 2019 - gllvm Fast analysis of multivariate abundance dat.pdf;/home/bolker/Documents/zotero_new/storage/T8VC3QDY/2041-210X.html}
-}
-
-@article{vanderveenConcurrentOrdinationSimultaneous2023,
-  title = {Concurrent Ordination: {{Simultaneous}} Unconstrained and Constrained Latent Variable Modelling},
-  shorttitle = {Concurrent Ordination},
-  author = {{van der Veen}, Bert and Hui, Francis K. C. and Hovstad, Knut A. and O'Hara, Robert B.},
-  year = {2023},
-  month = feb,
-  journal = {Methods in Ecology and Evolution},
-  volume = {14},
-  number = {2},
-  pages = {683--695},
-  issn = {2041-210X, 2041-210X},
-  doi = {10.1111/2041-210X.14035},
-  urldate = {2024-10-03},
-  abstract = {In community ecology, unconstrained ordination can be used to indirectly explore drivers of community composition, while constrained ordination can be used to directly relate predictors to an ecological community. However, existing constrained ordination methods do not explicitly account for community composition that cannot be explained by the predictors, so that they have the potential to misrepresent community composition if not all predictors are available in the data.                                                     We propose and develop a set of new methods for ordination and joint species distribution modelling (JSDM) as part of the generalized linear latent variable model (GLLVM) framework, that incorporate predictors directly into an ordination. This includes a new ordination method that we refer to as concurrent ordination, as it simultaneously constructs unconstrained and constrained latent variables. Both unmeasured residual covariation and predictors are incorporated into the ordination by simultaneously imposing reduced rank structures on the residual covariance matrix and on fixed-effects.                                                     We evaluate the method with a simulation study, and show that the proposed developments outperform canonical correspondence analysis (CCA) for Poisson and Bernoulli responses, and perform similar to redundancy analysis (RDA) for normally distributed responses, the two most popular methods for constrained ordination in community ecology. Two examples with real data further demonstrate the benefits of concurrent ordination, and the need to account for residual covariation in the analysis of multivariate data.                                                     This article contextualizes the role of constrained ordination in the GLLVM and JSDM frameworks, while developing a new ordination method that incorporates the best of unconstrained and constrained ordination, and which overcomes some of the deficiencies of existing classical ordination methods.},
-  langid = {english}
-}
-
-@article{mcgillycuddyParsimoniouslyFittingLarge2025,
-  title = {Parsimoniously Fitting Large Multivariate Random Effects in {glmmTMB}},
-  author = {McGillycuddy, Maeve and Warton, David I. and Popovic, Gordana and Bolker, Benjamin},
-  year = {2025},
-  journal = {Journal of Statistical Software}
-}
-
-@article{korhonenReviewGeneralizedLinear2024,
-  title = {A {{Review}} of {{Generalized Linear Latent Variable Models}} and {{Related Computational Approaches}}},
-  author = {Korhonen, Pekka and Nordhausen, Klaus and Taskinen, Sara},
-  year = {2024},
-  journal = {WIREs Computational Statistics},
-  volume = {16},
-  number = {6},
-  pages = {e70005},
-  issn = {1939-0068},
-  doi = {10.1002/wics.70005},
-  urldate = {2025-02-21},
-  abstract = {Generalized linear latent variable models (GLLVMs) have become mainstream models in this analysis of correlated, m-dimensional data. GLLVMs can be seen as a reduced-rank version of generalized linear mixed models (GLMMs) as the latent variables which are of dimension p{$\ll$}m{\textbackslash} p{\l}l m {\textbackslash} induce a reduced-rank covariance structure for the model. Models are flexible and can be used for various purposes, including exploratory analysis, that is, ordination analysis, estimating patterns of residual correlation, multivariate inference about measured predictors, and prediction. Recent advances in computational tools allow the development of efficient, scalable algorithms for fitting GLLMVs for any response distribution. In this article, we discuss the basics of GLLVMs and review some options for model fitting. We focus on methods that are based on likelihood inference. The implementations available in R are compared via simulation studies and an example illustrates how GLLVMs can be applied as an exploratory tool in the analysis of data from community ecology.},
-  copyright = {{\copyright} 2024 The Author(s). WIREs Computational Statistics published by Wiley Periodicals LLC.},
-  langid = {english},
-  keywords = {factor analysis,Gauss-Hermite,Laplace approximation,likelihood function,MCMC,quasi-likelihood},
-  file = {files/9/Korhonen 等 - 2024 - A Review of Generalized Linear Latent Variable Mod.pdf;files/10/wics.html}
-}
-
-@article{korhonenComparisonJointSpecies2024,
-  title = {A Comparison of Joint Species Distribution Models for Percent Cover Data},
-  author = {Korhonen, Pekka and Hui, Francis K. C. and Niku, Jenni and Taskinen, Sara and {van der Veen}, Bert},
-  year = {2024},
-  journal = {Methods in Ecology and Evolution},
-  volume = {15},
-  number = {12},
-  pages = {2359--2372},
-  issn = {2041-210X},
-  doi = {10.1111/2041-210X.14437},
-  urldate = {2025-02-21},
-  abstract = {Joint species distribution models (JSDMs) have gained considerable traction among ecologists over the past decade, due to their capacity to answer a wide range of questions at both the species- and the community-level. The family of generalised linear latent variable models in particular has proven popular for building JSDMs, being able to handle many response types including presence-absence data, biomass, overdispersed and/or zero-inflated counts. We extend latent variable models to handle percent cover response variables, with vegetation, sessile invertebrate and macroalgal cover data representing the prime examples of such data arising in community ecology. Sparsity is a commonly encountered challenge with percent cover data. Responses are typically recorded as percentages covered per plot, though some species may be completely absent or present, that is, have 0\% or 100\% cover, respectively, rendering the use of beta distribution inadequate. We propose two JSDMs suitable for percent cover data, namely a hurdle beta model and an ordered beta model. We compare the two proposed approaches to a beta distribution for shifted responses, transformed presence-absence data and an ordinal model for percent cover classes. Results demonstrate the hurdle beta JSDM was generally the most accurate at retrieving the latent variables and predicting ecological percent cover data.},
-  copyright = {{\copyright} 2024 The Author(s). Methods in Ecology and Evolution published by John Wiley \& Sons Ltd on behalf of British Ecological Society.},
-  langid = {english},
-  keywords = {beta regression,community-level modelling,latent variable model,ordination,percent cover data,zero-inflation},
-  file = {files/12/Korhonen 等 - 2024 - A comparison of joint species distribution models .pdf;files/13/2041-210X.html}
 }
 
 @article{kristensenTMBAutomaticDifferentiation2016,
@@ -133,36 +36,6 @@
   file = {files/25/Kristensen 等 - 2016 - TMB Automatic Differentiation and Laplace Approxi.pdf}
 }
 
-
-@article{smeenk-enserinkCorrelationsDistributionsHunting1974,
-  title = {{Correlations Between Distributions of Hunting Spiders (Lycosidae, Ctenidae) and Environmental Characteristics in a Dune Area}},
-  author = {{Smeenk-Enserink}, Nellie and Aart, P. J. M. Van Der},
-  year = {1974},
-  month = jan,
-  doi = {10.1163/002829675X00119},
-  urldate = {2025-04-04},
-  langid = {chinese},
-  keywords = {Biology,Journal,Zoology},
-  annotation = {Spider paper}
-}
-
-@misc{dhariwalDiffusionModelsBeat2021,
-  title = {Diffusion {{Models Beat GANs}} on {{Image Synthesis}}},
-  author = {Dhariwal, Prafulla and Nichol, Alex},
-  year = {2021},
-  month = jun,
-  number = {arXiv:2105.05233},
-  eprint = {2105.05233},
-  publisher = {arXiv},
-  doi = {10.48550/arXiv.2105.05233},
-  urldate = {2025-04-17},
-  abstract = {We show that diffusion models can achieve image sample quality superior to the current state-of-the-art generative models. We achieve this on unconditional image synthesis by finding a better architecture through a series of ablations. For conditional image synthesis, we further improve sample quality with classifier guidance: a simple, compute-efficient method for trading off diversity for fidelity using gradients from a classifier. We achieve an FID of 2.97 on ImageNet 128\${\textbackslash}times\$128, 4.59 on ImageNet 256\${\textbackslash}times\$256, and 7.72 on ImageNet 512\${\textbackslash}times\$512, and we match BigGAN-deep even with as few as 25 forward passes per sample, all while maintaining better coverage of the distribution. Finally, we find that classifier guidance combines well with upsampling diffusion models, further improving FID to 3.94 on ImageNet 256\${\textbackslash}times\$256 and 3.85 on ImageNet 512\${\textbackslash}times\$512. We release our code at https://github.com/openai/guided-diffusion},
-  archiveprefix = {arXiv},
-  keywords = {Computer Science - Artificial Intelligence,Computer Science - Computer Vision and Pattern Recognition,Computer Science - Machine Learning,Statistics - Machine Learning},
-  annotation = {diffusion},
-  file = {D\:\\zotero\\storage\\D8NPSMNB\\Dhariwal 和 Nichol - 2021 - Diffusion Models Beat GANs on Image Synthesis.pdf;D\:\\zotero\\storage\\T4KYXK8K\\2105.html}
-}
-
 @misc{RTMBIntro,
   title = {{{RTMB Intro}}},
   journal = {GitHub},
@@ -173,14 +46,33 @@
   file = {D:\zotero\storage\2YT3P52D\rtmb_intro.html}
 }
 
-@misc{ELBOWhatWhy2021,
-  title = {{{ELBO}} --- {{What}} \& {{Why}}},
-  year = {2021},
-  month = jan,
-  journal = {Yunfan's Blog},
-  urldate = {2025-03-30},
-  abstract = {ELBO (evidence lower bound) is a key concept in Variational Bayesian Methods. It transforms inference problems, which are always intractable, into optimization problems that can be solved with, for example, gradient-based methods.},
-  howpublished = {https://yunfanj.com/blog/2021/01/11/ELBO.html},
-  langid = {english},
-  file = {D:\zotero\storage\TY5RHNY5\ELBO.html}
+@article{eckert_parental_nodate,
+	title = {Parental care drives the evolution of male reproductive accessory glands across ray-finned fishes},
+	url = {https://dx.doi.org/10.1093/evolut/qpaf062},
+	abstract = {Abstract. Reproductive accessory glands are organs involved in reproduction that do not directly produce or release gametes but can play crucial roles in s},
+	language = {en},
+	urldate = {2025-09-21},
+	author = {Eckert, Lucas and Miller, Jessica S. and Fitzpatrick, John L. and Balshine, Sigal and Bolker, Benjamin M.},
+	note = {bolker paper},
+	file = {Full Text PDF:C\:\\Users\\Alan\\Zotero\\storage\\8EWD3UFX\\Eckert 等 - Parental care drives the evolution of male reproductive accessory glands across ray-finned fishes.pdf:application/pdf},
+}
+
+@article{boyko_generalized_2021,
+	title = {Generalized hidden {Markov} models for phylogenetic comparative datasets},
+	volume = {12},
+	copyright = {© 2020 British Ecological Society},
+	issn = {2041-210X},
+	url = {https://onlinelibrary.wiley.com/doi/abs/10.1111/2041-210X.13534},
+	doi = {10.1111/2041-210X.13534},
+	abstract = {Hidden Markov models (HMMs) have emerged as an important tool for understanding the evolution of characters that take on discrete states. Their flexibility and biological sensibility make them appealing for many phylogenetic comparative applications. Previously available packages placed unnecessary limits on the number of observed and hidden states that can be considered when estimating transition rates and inferring ancestral states on a phylogeny. To address these issues, we expanded the capabilities of the R package corHMM to handle n-state and n-character problems and provide users with a streamlined set of functions to create custom HMMs for any biological question of arbitrary complexity. We show that increasing the number of observed states increases the accuracy of ancestral state reconstruction. We also explore the conditions for when an HMM is most effective, finding that an HMM is an appropriate model when the degree of rate heterogeneity is moderate to high. Finally, we demonstrate the importance of these generalizations by reconstructing the phyllotaxy of the ancestral angiosperm flower. Partially contradicting previous results, we find the most likely state to be a whorled perianth, whorled androecium, whorled gynoecium. The difference between our analysis and previous studies was that our modelling explicitly allowed for the correlated evolution of several flower characters.},
+	language = {en},
+	number = {3},
+	urldate = {2025-09-21},
+	journal = {Methods in Ecology and Evolution},
+	author = {Boyko, James D. and Beaulieu, Jeremy M.},
+	year = {2021},
+	note = {corHMM},
+	keywords = {ancestral state reconstruction, discrete character evolution, hidden Markov models, hidden states, stochastic map},
+	pages = {468--478},
+	file = {Full Text PDF:C\:\\Users\\Alan\\Zotero\\storage\\X563PBK9\\Boyko和Beaulieu - 2021 - Generalized hidden Markov models for phylogenetic comparative datasets.pdf:application/pdf;Snapshot:C\:\\Users\\Alan\\Zotero\\storage\\2HCAW35Z\\2041-210X.html:text/html},
 }
