@@ -5,6 +5,7 @@ format:
   html:
     self-contained: true
     code-fold: true
+    code-summary: "Code"
 bibliography: ../pruning.bib
 csl: ../reflist2.csl
 date: today
@@ -41,13 +42,15 @@ source(here::here("R", "realtree.R"))
 - In getinfo.R, sumfun can run corHMM quietly, allowing you to choose between using RTMB or the original version, and extract information (computation time, log-likelihood, and predicted values, etc.).
 - RealTree.R provides a method for conducting large-scale benchmarking by sampling from real-world datasets.
 
-The dataset is from @eckert_parental_nodate
+The dataset is from ray-fish dataset (@eckert_parental_nodate)
 ```{r realdat}
+#| code-summary: "import data"
 fish_traits <- read.csv(here::here('data', "binaryTraitData.csv"))
 fish_tree   <- readRDS(here::here('data', "treeSingle.rds"))
 ```
 
 ```{r clean3traits}
+#| code-summary: "data cleaning"
 ctraits <- fish_traits[fish_traits$species %in% fish_tree$tip.label, ]
 
 ctraits <- ctraits[match(fish_tree$tip.label, ctraits$species), ]
@@ -66,6 +69,7 @@ c_traits <- c_traits[match(c_tree$tip.label, c_traits$Species), ]
 ```
 
 ```{r getdat, eval = FALSE}
+#| code-summary: "resampling and runing"
 ntaxvec <- as.numeric(45:234)
 
 dd <- expand.grid(seed = 101:104, ntaxa  = ntaxvec, ntrait = 3, model = "ARD", rate.cat = 1) |>
@@ -97,11 +101,15 @@ saveRDS(res_df, file = here::here("data", "trait3_subtree.rds"))
 
 
 ```{r dat}
+#| code-summary: "importing rds"
 dd <- readRDS(here::here("data", "trait3_subtree.rds"))
 if (!is.data.frame(dd)) dd <- as.data.frame(t(dd))
 ```
 
+RTMB (@RTMBIntro) shows a slight improvement in the calculation of negative log-likelihood (this is more noticeable when the tree length is small). When calculating larger trees, RTMB also demonstrates more stable computational performance, which can be observed through the smaller variance in computation time.
+
 ```{r loglik}
+#| code-summary: "loglik boxplot"
 dd$ldiff <- dd$RTMB_loglik - dd$orig_loglik
 
 dd$ntaxa_bin <- cut(
@@ -119,24 +127,14 @@ ggplot(dd, aes(x = ntaxa_bin, y = ldiff, fill = model)) +
     fill = "Model"
   ) +
   theme_minimal()
-
 ```
 
-
 ```{r ddtb}
+#| code-summary: "visualize both loglik and time"
 ddtb <- dd |>
-  mutate(
-    bad = case_when(
-      is.na(ldiff) ~ NA_character_,
-      abs(ldiff) < 1e-6 ~ "OK",  
-      ldiff < 0 ~ "RTMB",  
-      TRUE ~ "orig"  
-    ),
-    bad = factor(bad, levels = c("OK", "orig", "RTMB"))
-  ) |>
   transmute(
     seed, ntaxa, ntrait, model,
-    ldiff, bad,
+    ldiff,
     opt_RTMB = RTMB_opt.time,
     opt_orig = orig_opt.time,
     tot_RTMB = RTMB_tot.time,
@@ -144,70 +142,57 @@ ddtb <- dd |>
   ) |>
   pivot_longer(
     cols = c(opt_RTMB, opt_orig, tot_RTMB, tot_orig),
-    names_to   = c("type", "method"),
+    names_to      = c("type", "method"),
     names_pattern = "(opt|tot)_(RTMB|orig)",
-    values_to  = "value"
-  )
-
-ddtb <- ddtb |>
+    values_to     = "value"
+  ) |>
   mutate(
     type   = factor(type,   levels = c("opt", "tot")),
-    method = factor(method, levels = c("orig", "RTMB"))
+    method = factor(method, levels = c("orig", "RTMB")),
+
+    good = case_when(
+      is.na(ldiff) ~ NA_character_,
+      abs(ldiff) < 1e-6 ~ "OK",  
+      ldiff < 0 ~ "RTMB",  
+      ldiff > 0 ~ "orig"
+    ),
+    good = factor(good, levels = c("OK", "orig", "RTMB"))
   )
+
+ddtb_win <- bind_rows(
+  ddtb |> filter(good %in% c("orig", "RTMB"), as.character(method) == as.character(good))
+)
 ```
 
-
-```{r opt, message = FALSE, warning=FALSE}
+```{r}
+#| code-summary: "smaller nll scatter plot"
 ggplot(
-  filter(ddtb, type == "opt", method == "RTMB"),
+  ddtb_win,
   aes(x = ntaxa, y = value)
 ) +
-  geom_point(aes(colour = bad, size = abs(ldiff))) +
+  geom_point(aes(colour = good, size = abs(ldiff))) +
   scale_x_log10() +
   scale_y_log10() +
   scale_colour_manual(
     values = c(
-      "OK"   = adjustcolor("grey", alpha.f = 0.2), 
-      "orig" = "#377EB8",  
-      "RTMB" = "#E41A1C" 
+      "OK"   = adjustcolor("grey", alpha.f = 0.2),
+      "orig" = "#377EB8",
+      "RTMB" = "#E41A1C"
     ),
     na.value = "black"
   ) +
   scale_size(range = c(0.5, 3), guide = "none") +
+  facet_wrap(~ type, nrow = 1) +
   labs(
     x = "Number of taxa",
-    y = "time (s) for RTMB (opt)",
-    colour = "bad"
-  ) +
-  theme_minimal()
-```
-
-```{r tot, message = FALSE, warning=FALSE}
-ggplot(
-  filter(ddtb, type == "tot", method == "RTMB"),
-  aes(x = ntaxa, y = value)
-) +
-  geom_point(aes(colour = bad, size = abs(ldiff))) +
-  scale_x_log10() +
-  scale_y_log10() +
-  scale_colour_manual(
-    values = c(
-      "OK"   = adjustcolor("grey", alpha.f = 0.2), 
-      "orig" = "#377EB8",  
-      "RTMB" = "#E41A1C" 
-    ),
-    na.value = "black"
-  ) +
-  scale_size(range = c(0.5, 3), guide = "none") +
-  labs(
-    x = "Number of taxa",
-    y = "time (s) for RTMB (tot)",
-    colour = "bad"
+    y = "time of better nll (opt)",
+    colour = "smaller nll"
   ) +
   theme_minimal()
 ```
 
 ```{r together, message = FALSE, warning=FALSE}
+#| code-summary: "We can check all computing results"
 ggplot(ddtb, aes(x = ntaxa, y = value, colour = method)) +
   geom_point(alpha = 0.5, aes(shape = factor(ntrait))) +
   scale_x_log10() +
@@ -221,16 +206,17 @@ ggplot(ddtb, aes(x = ntaxa, y = value, colour = method)) +
   ) +
   labs(
     x = "Number of taxa",
-    y = "time (s)",
+    y = "time",
     colour   = "method",
     shape    = "ntrait",
     linetype = "ntrait"
   ) +
   theme_minimal()
-
 ```
 
+The data was grouped according to ntaxa, and the median was used to represent the ratio of RTMB and orig_corHMM computation times under normal circumstances. There was approximately a 50 to 100-fold improvement, and this ratio increased with increasing ntaxa.
 ```{r prop, message = FALSE, warning=FALSE}
+#| code-summary: "propotion"
 dd$speedup_tot  <- dd$orig_tot.time / dd$RTMB_tot.time
 dd$speedup_opt  <- dd$orig_opt.time / dd$RTMB_opt.time
 

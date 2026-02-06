@@ -1,6 +1,0 @@
-stan
-
-- Use TMB + nlminb to perform 10 multistart iterations to find the maximum value.
-
-- Then feed the optimal solution for that row into tmbstan() for HMC sampling
-

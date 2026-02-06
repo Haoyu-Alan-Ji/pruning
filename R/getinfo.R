@@ -18,9 +18,9 @@ sumfun <- function(ntrait = 2, ntaxa = 200, model = "ARD", seed = NULL,
   if (!is.null(traitMatrix) && !is.null(realtree)) {
   ss <- realfun(raw_traitM = traitMatrix,
                 raw_tree = realtree) 
-} else {
+  } else {
   ss <- simfun(ntrait = ntrait, ntaxa = ntaxa, seed = seed)
-}
+  }
 
   fit_orig <- fitfun(ss, model = model, ...)
   fit_RTMB <- fitfun(ss, use_RTMB = TRUE, model = model, ...)
