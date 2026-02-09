@@ -38,9 +38,9 @@ source(here::here("R", "getinfo.R"))
 source(here::here("R", "realtree.R"))
 ```
 
-- In Q_template.R, Q_template can be used to generate transit matrix Q, simfun can output trees of arbitrary length and specify the desired trait matrix for generation (currently only supports binary strates).
-- In getinfo.R, sumfun can run corHMM quietly, allowing you to choose between using RTMB or the original version, and extract information (computation time, log-likelihood, and predicted values, etc.).
-- RealTree.R provides a method for conducting large-scale benchmarking by sampling from real-world datasets.
+- In `Q_template.R`, `Q_template()` can be used to generate the transition matrix $Q$, `simfun()` can output trees of arbitrary size and specify the desired trait matrix for generation (currently only supports binary strates).
+- In `getinfo.R`, `sumfun()` can run corHMM quietly, allowing you to choose between using RTMB or the original version, and extract information (computation time, log-likelihood, and predicted values, etc.).
+- `RealTree.R` provides a method for conducting large-scale benchmarking by sampling from real-world datasets.
 
 The dataset is composed of traits + a phylogeny on ray-finned fishes [@eckert_parental_2025]
 ```{r realdat}
@@ -106,7 +106,7 @@ dd <- readRDS(here::here("data", "trait3_subtree.rds"))
 if (!is.data.frame(dd)) dd <- as.data.frame(t(dd))
 ```
 
-RTMB (@RTMBIntro) shows a slight improvement in the calculation of negative log-likelihood (this is more noticeable when the tree length is small). When calculating larger trees, RTMB also demonstrates more stable computational performance, which can be observed through the smaller variance in computation time.
+RTMB [@RTMBPkg] shows a slight improvement in the calculation of negative log-likelihood (this is more noticeable when the tree length is small). When calculating larger trees, RTMB also demonstrates more stable computational performance, which can be observed through the smaller variance in computation time.
 
 ```{r loglik}
 #| code-summary: "loglik boxplot"
@@ -164,7 +164,7 @@ ddtb_win <- bind_rows(
 )
 ```
 
-```{r}
+```{r nll-scatter}
 #| code-summary: "smaller nll scatter plot"
 ggplot(
   ddtb_win,
