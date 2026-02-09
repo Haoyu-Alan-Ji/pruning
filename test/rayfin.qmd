@@ -42,7 +42,7 @@ source(here::here("R", "realtree.R"))
 - In getinfo.R, sumfun can run corHMM quietly, allowing you to choose between using RTMB or the original version, and extract information (computation time, log-likelihood, and predicted values, etc.).
 - RealTree.R provides a method for conducting large-scale benchmarking by sampling from real-world datasets.
 
-The dataset is from ray-fish dataset (@eckert_parental_nodate)
+The dataset is composed of traits + a phylogeny on ray-finned fishes [@eckert_parental_2025]
 ```{r realdat}
 #| code-summary: "import data"
 fish_traits <- read.csv(here::here('data', "binaryTraitData.csv"))
