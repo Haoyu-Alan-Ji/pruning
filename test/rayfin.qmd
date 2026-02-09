@@ -17,8 +17,6 @@ setwd(here::here())
 ```
 
 ```{r pkgs, include=FALSE, message = FALSE, warning=FALSE}
-## https://github.com/bbolker/corHMM/blob/bolker_clean/misc/test_RTMB.R
-## remotes::install_github("bbolker/corHMM", ref = "bolker_clean")
 library(Matrix)
 library(ape)
 library(tidyverse); theme_set(theme_bw())
@@ -32,6 +30,10 @@ set.seed(427)
 
 ```{r funs, message = FALSE, warning=FALSE}
 #| code-fold: false
+
+## corHMM version
+## https://github.com/bbolker/corHMM/blob/bolker_clean/misc/test_RTMB.R
+## remotes::install_github("bbolker/corHMM", ref = "bolker_clean")
 source(here::here("R", "Q_template.R"))
 source(here::here("R", "getinfo.R"))
 source(here::here("R", "realtree.R"))
@@ -105,7 +107,7 @@ dd <- readRDS(here::here("data", "trait3_subtree.rds"))
 if (!is.data.frame(dd)) dd <- as.data.frame(t(dd))
 ```
 
-RTMB [@RTMBPkg] shows a slight improvement in the calculation of negative log-likelihood (this is more noticeable when the tree length is small). When calculating larger trees, RTMB also demonstrates more stable computational performance, which can be observed through the smaller variance in computation time.
+RTMB [@RTMBPkg] shows a slight improvement in the calculation of negative log-likelihood (this is more noticeable when the tree length is small). 
 
 ```{r loglik}
 #| code-summary: "loglik boxplot"
@@ -129,7 +131,7 @@ ggplot(dd, aes(x = ntaxa_bin, y = ldiff, fill = model)) +
 ```
 
 ```{r ddtb}
-#| code-summary: "visualize both loglik and time"
+#| code-summary: "basic operations"
 ddtb <- dd |>
   transmute(
     seed, ntaxa, ntrait, model,
@@ -157,41 +159,12 @@ ddtb <- dd |>
     ),
     good = factor(good, levels = c("OK", "orig", "RTMB"))
   )
-
-ddtb_win <- bind_rows(
-  ddtb |> filter(good %in% c("orig", "RTMB"), as.character(method) == as.character(good))
-)
 ```
 
-```{r nll-scatter}
-#| code-summary: "smaller nll scatter plot"
-ggplot(
-  ddtb_win,
-  aes(x = ntaxa, y = value)
-) +
-  geom_point(aes(colour = good, size = abs(ldiff))) +
-  scale_x_log10() +
-  scale_y_log10() +
-  scale_colour_manual(
-    values = c(
-      "OK"   = adjustcolor("grey", alpha.f = 0.2),
-      "orig" = "#377EB8",
-      "RTMB" = "#E41A1C"
-    ),
-    na.value = "black"
-  ) +
-  scale_size(range = c(0.5, 3), guide = "none") +
-  facet_wrap(~ type, nrow = 1) +
-  labs(
-    x = "Number of taxa",
-    y = "time of better nll (opt)",
-    colour = "smaller nll"
-  ) +
-  theme_minimal()
-```
+Then check all computing time results.
 
 ```{r together, message = FALSE, warning=FALSE}
-#| code-summary: "We can check all computing results"
+#| code-summary: "visualize time output"
 ggplot(ddtb, aes(x = ntaxa, y = value, colour = method)) +
   geom_point(alpha = 0.5) +
   scale_x_log10() +
@@ -212,7 +185,7 @@ ggplot(ddtb, aes(x = ntaxa, y = value, colour = method)) +
 
 The data was grouped according to ntaxa, and the median was used to represent the ratio of RTMB and orig_corHMM computation times under normal circumstances. There was approximately a 50 to 100-fold improvement, and this ratio increased with increasing ntaxa.
 ```{r prop, message = FALSE, warning=FALSE}
-#| code-summary: "propotion"
+#| code-summary: "reveal in propotion"
 dd$speedup_tot  <- dd$orig_tot.time / dd$RTMB_tot.time
 dd$speedup_opt  <- dd$orig_opt.time / dd$RTMB_opt.time
 
@@ -243,6 +216,38 @@ ggplot(speed_sum, aes(x = ntaxa, y = med_speedup, colour = model)) +
     x = "Number of taxa",
     y = "Median speedup (orig / RTMB)",
     colour = "Model"
+  ) +
+  theme_minimal()
+```
+
+Now we plot comp-time and neg-loglik together. For the same seed and ntaxa, we compare the results from orig-corHMM and RTMB, and select the result with the smaller nll (nll winner). This result is then put on a scatter plot with ntaxa on the x-axis and comp-time on the y-axis. The size of the point represents the advantage of the nll winner over the other method in that case. Notice that RTMB shows better linearity when there were more nll winners, and this situation goes better when ntaxa increases. Such comparision implys RTMB has more stable computational performance.
+
+```{r nll-scatter}
+#| code-summary: "nll winner"
+ddtb_win <- bind_rows(
+  ddtb |> filter(good %in% c("orig", "RTMB"), as.character(method) == as.character(good))
+)
+ggplot(
+  ddtb_win,
+  aes(x = ntaxa, y = value)
+) +
+  geom_point(aes(colour = good, size = abs(ldiff))) +
+  scale_x_log10() +
+  scale_y_log10() +
+  scale_colour_manual(
+    values = c(
+      "OK"   = adjustcolor("grey", alpha.f = 0.2),
+      "orig" = "#377EB8",
+      "RTMB" = "#E41A1C"
+    ),
+    na.value = "black"
+  ) +
+  scale_size(range = c(0.5, 3), guide = "none") +
+  facet_wrap(~ type, nrow = 1) +
+  labs(
+    x = "Number of taxa",
+    y = "time of better nll (opt)",
+    colour = "smaller nll"
   ) +
   theme_minimal()
 ```
