@@ -7,7 +7,6 @@ format:
     code-fold: true
     code-summary: "Code"
 bibliography: ../pruning.bib
-csl: ../reflist2.csl
 date: today
 ---
 
@@ -194,12 +193,11 @@ ggplot(
 ```{r together, message = FALSE, warning=FALSE}
 #| code-summary: "We can check all computing results"
 ggplot(ddtb, aes(x = ntaxa, y = value, colour = method)) +
-  geom_point(alpha = 0.5, aes(shape = factor(ntrait))) +
+  geom_point(alpha = 0.5) +
   scale_x_log10() +
   scale_y_log10() +
   facet_wrap(~ type, scales = "free_y") +
   geom_smooth(
-    aes(linetype = factor(ntrait)),
     method = "lm",  
     se = FALSE,
     size = 0.8
@@ -207,9 +205,7 @@ ggplot(ddtb, aes(x = ntaxa, y = value, colour = method)) +
   labs(
     x = "Number of taxa",
     y = "time",
-    colour   = "method",
-    shape    = "ntrait",
-    linetype = "ntrait"
+    colour   = "method"
   ) +
   theme_minimal()
 ```
