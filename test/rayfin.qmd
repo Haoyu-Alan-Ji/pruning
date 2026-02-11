@@ -1,5 +1,5 @@
 ---
-title: "parametric bootstrap in real data"
+title: "RTMB/corHMM comparisons on rayfinned fish data"
 author: "Haoyu Ji"
 format: 
   html:
@@ -22,6 +22,7 @@ library(ape)
 library(tidyverse); theme_set(theme_bw())
 library(expm)
 library(RTMB)
+library(colorspace)
 ```
 
 ```{r seed, include=FALSE}
@@ -70,7 +71,7 @@ c_traits <- c_traits[match(c_tree$tip.label, c_traits$Species), ]
 ```
 
 ```{r getdat, eval = FALSE}
-#| code-summary: "resampling and runing"
+#| code-summary: "resampling and running"
 ntaxvec <- as.numeric(45:234)
 
 dd <- expand.grid(seed = 101:104, ntaxa  = ntaxvec, ntrait = 3, model = "ARD", rate.cat = 1) |>
@@ -105,13 +106,15 @@ saveRDS(res_df, file = here::here("data", "trait3_subtree.rds"))
 #| code-summary: "importing rds"
 dd <- readRDS(here::here("data", "trait3_subtree.rds"))
 if (!is.data.frame(dd)) dd <- as.data.frame(t(dd))
+dd$ldiff <- dd$RTMB_loglik - dd$orig_loglik
+tt <- t.test(dd$ldiff)
+qq <- quantile(dd$ldiff, c(0.25, 0.75))
 ```
 
-RTMB [@RTMBPkg] shows a slight improvement in the calculation of negative log-likelihood (this is more noticeable when the tree length is small). 
+RTMB [@RTMBPkg] shows a slight improvement in the calculation of negative log-likelihood (this is more noticeable when the tree length is small). The mean difference across all simulations is that RTMB gets a result that is `r round(tt$estimate, 2)` log-likelihood units better on average (95% CI `r round(tt$conf.int[1], 2)` - `r round(tt$conf.int[2], 2)`), with an interquartile (0.25 to 0.75) range from `r round(qq[1], 2)` LL units better to `r round(qq[2], 2)` LL units worse. (We haven't tried this with multiple random starting values yet.) These results are for the ARD (all rates different) model with 3 binary traits (24 parameters; no non-trivial covarion-model examples yet).
 
 ```{r loglik}
 #| code-summary: "loglik boxplot"
-dd$ldiff <- dd$RTMB_loglik - dd$orig_loglik
 
 dd$ntaxa_bin <- cut(
   dd$ntaxa,
@@ -119,13 +122,13 @@ dd$ntaxa_bin <- cut(
   labels = c("≤60", "61–100", "101–150", "151+")
 )
 
-ggplot(dd, aes(x = ntaxa_bin, y = ldiff, fill = model)) +
-  geom_boxplot() +
+ggplot(dd, aes(x = ntaxa_bin, y = ldiff)) +
+  geom_violin(fill = "gray", trim = FALSE) +
+  geom_boxplot(fill = "lightblue", alpha = 0.5) +
   geom_hline(yintercept = 0, linetype = "dashed") +
   labs(
     x = "Number of taxa (binned)",
-    y = "RTMB_loglik - orig_loglik",
-    fill = "Model"
+    y = "difference in log-likelihood\n(RTMB - original)"
   ) +
   theme_minimal()
 ```
@@ -177,15 +180,16 @@ ggplot(ddtb, aes(x = ntaxa, y = value, colour = method)) +
   ) +
   labs(
     x = "Number of taxa",
-    y = "time",
+    y = "time (seconds)",
     colour   = "method"
   ) +
+    scale_colour_discrete_qualitative() +
   theme_minimal()
 ```
 
 Group the data according to ntaxa, and use median to represent the ratio of RTMB and orig_corHMM computation times under normal circumstances. There was approximately a 50 to 100-fold improvement, and this ratio increased with increasing ntaxa.
 ```{r prop, message = FALSE, warning=FALSE}
-#| code-summary: "reveal in propotion"
+#| code-summary: "reveal in proportion"
 dd$speedup_tot  <- dd$orig_tot.time / dd$RTMB_tot.time
 dd$speedup_opt  <- dd$orig_opt.time / dd$RTMB_opt.time
 
@@ -220,7 +224,7 @@ ggplot(speed_sum, aes(x = ntaxa, y = med_speedup, colour = model)) +
   theme_minimal()
 ```
 
-Now we plot comp-time and neg-loglik together. For the same seed and ntaxa, we compare the results from orig-corHMM and RTMB, and select the result with the smaller nll (nll winner). This result is then put on a scatter plot with ntaxa on the x-axis and comp-time on the y-axis. The size of the point represents the advantage of the nll winner over the other method in that case. Notice that RTMB shows better linearity when there were more nll winners, and this situation goes better when ntaxa increases. Such comparision implys RTMB has more stable computational performance.
+Now we plot computation time and negative log likelihood results together. For the same seed and ntaxa, we compare the results from original corHMM and RTMB, and select the result with the smaller NLL ("nll winner"). This result is then put on a scatter plot with ntaxa on the x-axis and comp-time on the y-axis. The size of the point represents the advantage of the nll winner over the other method in that case. Notice that RTMB shows better linearity when there were more nll winners, and this situation goes better when ntaxa increases. This comparison implies RTMB has more stable computational performance.
 
 ```{r nll-scatter}
 #| code-summary: "nll winner"
