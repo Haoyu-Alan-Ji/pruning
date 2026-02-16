@@ -30,8 +30,8 @@ set.seed(427)
 ```
 
 ```{r primate-tree1}
-source("../R/pruning_funs.R")
-load("../data/primates.rda")
+source("R/pruning_funs.R")
+load("data/primates.rda")
 ```
 
 ```{r 4by4_tree1}

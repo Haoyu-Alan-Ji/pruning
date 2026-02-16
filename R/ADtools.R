@@ -30,14 +30,23 @@ to_bin <- function(x, n = 2) {
 }
 
 
+# The expm method of Matrix cannot be optimized by AD, but RTMB can accept this, provided that Q for signature 'advector'. https://rdrr.io/cran/RTMB/man/ADmatrix.html
+
 #' @param trans_rates vector of transition rates
 #' @param Q_template a square matrix with zero values on the diagonal, and corresponding to any forbidden transitions, and integer indices in positions corresponding to distinct transition rates
-setup_Q <- function(trans_rates, Q_template) {
-  Q <- Q_template
-  Q[Q!=0] <- trans_rates[Q[Q!=0]] 
-  diag(Q) <- -1*rowSums(Q)
-  return(Q)
+setup_Q <- function(log_trans_rates, Q_template) {
+  idx <- which(Q_template != 0)      
+  map <- as.integer(Q_template[idx])   
+  rates <- exp(log_trans_rates)      
+  
+  Q <- RTMB::AD(matrix(0, nrow(Q_template), ncol(Q_template)))
+  Q[idx] <- rates[map]
+  diag(Q) <- -rowSums(Q)
+  Q
 }
+
+#https://cran.r-project.org/web/packages/RTMB/vignettes/RTMB-introduction.html
+cmb <- function(f, d) function(p) f(p, d)
 
 #' @param pars named list of parameters (
 #' TMBdata *should exist in the environment* and should
@@ -45,14 +54,14 @@ setup_Q <- function(trans_rates, Q_template) {
 #' - `tree` (a `phylo` object as defined in the `ape` package)
 #' - trait_values (a vector of integer trait values, corresponding to states at tips)
 #' - Q_template (a matrix with non-zero integer indices at all allowed locations)
-prune_nll <- function(pars) {
+prune_nll <- function(pars, Phylodata) {
   if (!require("RTMB")) stop("install RTMB package")
   "[<-" <- ADoverload("[<-")
   "c" <- ADoverload("c")
   "diag<-" <- ADoverload("diag<-")
-  getAll(pars, TMBdata)
+  getAll(pars, Phylodata)
   d <- ncol(Q_template)
-  Q <- setup_Q(exp(log_trans_rates), Q_template)
+  Q <- setup_Q(log_trans_rates, Q_template)
   liks <- matrix(NA, nrow = Ntip(tree) + tree$Nnode, ncol = d)
   ntips <- length(trait_values)
   ## FIXME: this can be generalized (for polymorphic/unknown states),
@@ -72,9 +81,11 @@ prune_nll <- function(pars) {
     v <- 1
     for (j in seq_along(desRows)) {
       t <- tree$edge.length[desRows[j]]
-      P <- Matrix::expm(Q * t)
-      v <- drop(v * (P %*% liks[desNodes[j], ]))
-    }
+      childlik <- matrix(liks[desNodes[j], ], ncol = 1)
+      P <- Matrix::expm(Q * t)     
+      u <- drop(P %*% childlik)     
+      v <- drop(v * u)
+          }
     comp[i] <- sum(v)
     liks[i, ] <- v / comp[i]
   }
@@ -85,3 +96,13 @@ prune_nll <- function(pars) {
   return(neg_loglik)
 }
 
+random_refit <- function(ff) {
+  n <- length(ff$par)
+  start <- log(abs(rnorm(n)))
+  res <- with(ff, nlminb(start, fn, gr))
+  names(start) <- paste0("start", seq_along(start))
+  fitted <-  res$par
+  names(fitted) <- paste0("fitted", seq_along(fitted))
+  with(res, data.frame(objective, convergence, message,
+                       rbind(start), rbind(fitted)))
+}

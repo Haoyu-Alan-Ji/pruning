@@ -4,21 +4,28 @@ library(waldo)
 library(expm)
 library(RTMB)
 
-source("R/Q_template.R")
-source("R/generate_traits.R")
-source("../R/loglik.R")
-source("../R/random_refit.R")
+source("R/ADtools.R")
+source("R/random_refit.R")
 
-pruningAD <- function(tree, traitMatrix, trait, state, rep.times = 100,
-                      meanrate = 1, opt.args = NULL) {
+pruningAD <- function(tree, trait, state, rep.times = 100,
+                      meanrate = 1, pars, opt.args = NULL) {
   Q <- Q_template(state,trait)
-  nrates <- sum(Q != 0)
-  Q[Q!=0] <- rexp(nrates, rate = 1/meanrate)
+
+  repeat {
+  s <- phangorn::simSeq(tree, l = 1, Q = Q,
+                        type = "USER", levels = seq(nstate^ntrait),
+                        rate = 1)
+  if (nrow(unique(as.character(s))) == prod(nstate^ntrait)) break
+  }
+
+  s <- as.numeric(unlist(s))
+
+  # nrates <- sum(Q != 0)
+  # Q[Q!=0] <- rexp(nrates, rate = 1/meanrate)
   
-  traitList <- multi_to_single(traitMatrix[,-1], c(state, trait))
-  Phylodata <- list(Q_template = Q, tree = tree, trait_values = traitList, traitMatrix = traitMatrix)
+  Phylodata <- list(Q_template = Q, tree = tree, trait_values = s)
   
-  ff <- MakeADFun(cmb(prune_nll, Phylodata), list(log_trans_rates = pars.start), silent = TRUE)
+  ff <- MakeADFun(cmb(prune_nll, Phylodata), list(log_trans_rates = pars), silent = TRUE)
   AD <- suppressWarnings(with(ff, do.call(nlminb, c(list(par, fn, gr), opt.args))))
   
   result_frame <- suppressWarnings(
