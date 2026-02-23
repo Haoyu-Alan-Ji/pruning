@@ -7,8 +7,8 @@ library(future.apply)
 library(rstream)
 library(parallel)
 
-source(here::here('R', 'Q_template.R'))
-source(here::here('R', 'getinfo.R'))
+source(here::here('R', 'pruninf_funs.R'))
+source(here::here('R', 'corHMM_sim.R'))
 
 #' @examples
 #' streams <- make_streams(9, seed6 = c(1,2,3,4,5,6))

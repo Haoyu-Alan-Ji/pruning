@@ -8,7 +8,7 @@ library(future.apply)
 library(parallel)
 
 setwd(here::here())
-source("R/pruning_funs1.R")
+source("R/pruning_funs.R")
 
 #' @param p parameters (log-hazard rates)
 #' @param lb lower bound(s) for baseline priors

@@ -1,6 +1,49 @@
 library(corHMM)
 library(rbenchmark)
 
+## setname <- function(x) {cbind(nm = rownames(x), x)}
+##' @param nstate number of states per trait (currently limited to 2)
+##' @param ntrait number of traits
+##' @param ntaxa number of taxa/phylogenty tips
+##' @param seed random-number seed
+##' @param meanrate mean transition rate
+##' @param seql trait
+##' @param collapse_allow for corHMM collapse function
+##' @examples
+##' simfun(ntaxa = 8)
+simfun <- function(nstate = 2, ntrait = 2, ntaxa = 20, seed = NULL,
+                   meanrate = 1, seql = 1, collapse = FALSE) {
+  if (nstate!=2) stop("oops, simSeq to trait matrix not implemented for nstate!=2, 
+                      to_bin's binary algorithm determines that the state can only be 2")
+  if (!is.null(seed)) set.seed(seed)
+  require("ape")
+  require("phangorn")
+  phy <- ape::rtree(ntaxa)
+  phy <- reorder(phy, "pruningwise")
+  
+  Q <- Q_template(n=nstate, k= ntrait)
+  nrates <- sum(Q != 0)
+  Q[Q!=0] <- rexp(nrates, rate = 1/meanrate)
+  
+  s <- phangorn::simSeq(phy, l = seql, Q = Q,
+                        type = "USER", levels = seq(nstate^ntrait),
+                        rate = 1)
+  if (collapse == FALSE) {
+    repeat {
+      s <- phangorn::simSeq(phy, l = seql, Q = Q,
+                            type = "USER", levels = seq(nstate^ntrait),
+                            rate = 1)
+      if (nrow(unique(as.character(s))) == prod(nstate^ntrait)) break
+    }
+  }
+  traitMatrix <- sapply(s, function(x) to_bin(x = x-1, n = ntrait)) |>
+    t() |>
+    as.data.frame() #|>
+  #setname()
+  
+  list(tree = phy, data = traitMatrix)
+}
+
 parfun <- function(x) log(na.omit(c(x$solution)))
 
 fitfun  <- function(dat, ..., rate.cat = 1) {
