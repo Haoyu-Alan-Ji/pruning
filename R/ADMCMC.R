@@ -8,61 +8,7 @@ library(future.apply)
 library(parallel)
 
 setwd(here::here())
-source("R/pruning_funs1.R")
-
-#' @param p parameters (log-hazard rates)
-#' @param lb lower bound(s) for baseline priors
-#' @param ub upper bound(s)
-#' @param range width of Gaussian (+/- SD between mean and lower/upper bounds)
-#' @param gainloss_pairs
-#' @param lb_gainloss
-#' @param ub_gainloss
-#' @param range_gainloss number of SDs from center to lower/upper bounds
-#' @param nllfun \emph{negative} log-likelihood function
-#' @param negative return negative log posterior?
-postfun <- function(pars, Phylodata,
-                    ## add whatever arguments the RTMB pruning algorithm loglik function
-                    ## needs (tree, trait data, etc.)
-                    # p,
-                    lb = log(1e-9), ub = log(1e2), range = 3,
-                    # gainloss_pairs = NULL,
-                    lb_gainloss = log(1e-3), ub_gainloss = log(1e3), range_gainloss = 3,
-                    negative = FALSE
-                    ) {
-  "[<-" <- ADoverload("[<-")
-  "c" <- ADoverload("c")
-  "diag<-" <- ADoverload("diag<-")
-  getAll(pars, Phylodata)
-  
-  ## call RTMB pruning-algorithm code here to compute log-likelihood ...
-  nll <- prune_nll(pars, Phylodata)
-  loglik <- -1*nll
-
-  prior.mean <- (lb + ub) / 2
-  prior.sd <- (ub - lb) / (2 * range)
-  p <- log_trans_rates # should I do this?
-  logdnorm <- function(x, mu, sd) {
-    -0.5 * log(2*pi*sd^2) - 0.5 * ((x - mu)/sd)^2
-  }
-  log.prior  <- sum(logdnorm(p, prior.mean, prior.sd))
-  ## product of likelihood and prior -> sum of LL and log-prior
-  res <- loglik + log.prior
-  ## calculate gain/loss priors
-
-  gl.prior.mean <- (lb_gainloss + ub_gainloss) / 2
-  gl.prior.sd <- (ub_gainloss - lb_gainloss) / (2 * range_gainloss)
-  ## vapply might not work in RTMB? replace with for loop?
-  gl.values <- p[1] * 0 + numeric(length(gainloss_pairs))
-  for (i in seq_len(length(gainloss_pairs))) {
-    idx <- gainloss_pairs[[i]]
-    gl.values[i] <- p[idx[1]] - p[idx[2]]
-  }
-  gl.log.prior <- sum(logdnorm(gl.values, gl.prior.mean, gl.prior.sd))
-
-  res <- -1*(res + gl.log.prior)
-  
-  return(res)
-}
+source("R/ADtools.R")
 
 pack_refit <- function(start, res) {
   start <- as.numeric(start)
@@ -110,15 +56,59 @@ random_refit <- function(task, Phylodata, pars0, opt.args = NULL) {
   df
 }
 
-postAD <- function(tree, trait, state, pars,
-                  traitMatrix = NULL,
-                  multistart = 10,
-                  parallel = TRUE,
-                  seed = 427,
-                  jitter.sd = 0.5,
-                  opt.args = NULL,
-                  keep_all = FALSE,
-                  rng_misuse = c("warning","error","ignore")) {
+postfun <- function(pars, Phylodata,
+                    ## add whatever arguments the RTMB pruning algorithm loglik function
+                    ## needs (tree, trait data, etc.)
+                    # p,
+                    lb = log(1e-9), ub = log(1e2), range = 3,
+                    # gainloss_pairs = NULL,
+                    lb_gainloss = log(1e-3), ub_gainloss = log(1e3), range_gainloss = 3,
+                    negative = FALSE
+                    ) {
+  "[<-" <- ADoverload("[<-")
+  "c" <- ADoverload("c")
+  "diag<-" <- ADoverload("diag<-")
+  getAll(pars, Phylodata)
+  
+  ## call RTMB pruning-algorithm code here to compute log-likelihood ...
+  nll <- prune_nll(pars, Phylodata)
+  loglik <- -1*nll
+
+  prior.mean <- (lb + ub) / 2
+  prior.sd <- (ub - lb) / (2 * range)
+  p <- log_trans_rates # should I do this?
+  logdnorm <- function(x, mu, sd) {
+    -0.5 * log(2*pi*sd^2) - 0.5 * ((x - mu)/sd)^2
+  }
+  log.prior  <- sum(logdnorm(p, prior.mean, prior.sd))
+  ## product of likelihood and prior -> sum of LL and log-prior
+  res <- loglik + log.prior
+  ## calculate gain/loss priors
+
+  gl.prior.mean <- (lb_gainloss + ub_gainloss) / 2
+  gl.prior.sd <- (ub_gainloss - lb_gainloss) / (2 * range_gainloss)
+  ## vapply might not work in RTMB? replace with for loop?
+  gl.values <- p[1] * 0 + numeric(length(gainloss_pairs))
+  for (i in seq_len(length(gainloss_pairs))) {
+    idx <- gainloss_pairs[[i]]
+    gl.values[i] <- p[idx[1]] - p[idx[2]]
+  }
+  gl.log.prior <- sum(logdnorm(gl.values, gl.prior.mean, gl.prior.sd))
+
+  res <- -1*(res + gl.log.prior)
+  
+  return(res)
+}
+
+postAD_parallel <- function(tree, trait, state, pars,
+                            traitMatrix = NULL,
+                            multistart = 10,
+                            parallel = TRUE,
+                            seed = 427,
+                            jitter.sd = 0.5,
+                            opt.args = NULL,
+                            keep_all = FALSE,
+                            rng_misuse = c("warning","error","ignore")) {
 
   rng_misuse <- match.arg(rng_misuse)
 
@@ -137,7 +127,7 @@ postAD <- function(tree, trait, state, pars,
 
   Q_temp <- Q_template(state, trait)
 
-  if (is.null(traitMatrix)) {
+  if (!is.null(traitMatrix)) {
     repeat {
       set.seed(seed)
       s <- phangorn::simSeq(tree, l = 1, Q = Q_temp,
@@ -241,31 +231,17 @@ postAD <- function(tree, trait, state, pars,
 
   obj.best <- ff0$fn(pars.best)
   gr.best  <- ff0$gr(pars.best)
-  fn.cdf <- ecdf(result_good$objective)
 
   t_total1 <- proc.time()[["elapsed"]]
-  time_total = t_total1 - t_total0
 
   out <- list(pars.best  = pars.best, obj.best = obj.best, gr.best = gr.best, Phylo = Phylodata,
               multistart = multistart, workers = workers, cores_detected = parallel::detectCores(),
-              time_total = time_total
+              time_total = t_total1 - t_total0
               )
   if (keep_all) out$result_frame <- result_frame
-  cat('loglik:\n'); print(obj.best)
-  cat('pars:\n'); print(pars.best)
-  cat('time:\n'); print(time_total)
-  cat('loglik cdf:\n'); plot(fn.cdf)
   out
 }
 
-set.seed(427)
-m3 <- rtree(20)
-g1 <- reorder(m3, "pruningwise")
-log_trans_rates <- log(abs(rnorm(8)))
-res <- postAD(g1, 2, 2, log_trans_rates, multistart = 10, seed = 427)
-# loglik:
-# [1] 56.66951
-# pars:
-# [1] -1.3560630 -8.0470661 -3.2236295 -0.1622979 -8.0401864 -0.7608131 -1.1870146 -0.4633658
-# time:
-# [1] 11.44
+res <- postAD_parallel(g1, 2, 2, log_trans_rates, multistart = 100, seed = 427)
+res$obj.best
+res$pars.best
