@@ -1,0 +1,115 @@
+---
+title: CBC meeting
+author: Haoyu Ji, Supervised by Biyue Dai
+institute: Department of Biostatistics, University of Minnesota
+format:
+  revealjs:
+    theme: 
+      - ../pre_style.scss
+      - serif
+    slide-number: true
+    self-contained: true
+---
+
+# Outline
+- gtsummary package
+- ggplot2
+- yaml setting
+- reproducible workingflow
+- render html slides
+
+
+# Starts from where we paused
+
+## gtsummary and ggplot
+
+Let's make a review about last meeting!
+
+
+# Consider the pain points in creating reproducible workflows
+
+::: {.justify}
+# Why quarto but not rmarkdown? {.smaller}
+
+- Strong support for HTML, making rendering convenient
+- Producing reports, slides, and a website for the same content. 
+- Making slides: revealjs (quarto default slides format) > ioslides/slidy (default in rmarkdown)!
+- Reproducible: Both built-in features and external support
+- Positron support: new generation R IDE aiming to replace R Studio
+
+:::
+
+# yaml setting
+
+## Basic settings
+
+- `title`
+- `author: name`
+- `institute: address`
+- `format: html/pdf/Latex...`
+- `date`
+
+## Can these setting make file reproducible? {.scrollable .smaller}
+
+:::: columns
+::: column
+### HTML
+- `self-contained: true`
+- `code-fold: true`
+- `code-summary: "Code"`
+:::
+
+::: column
+### Bibliography
+- `bibliography`
+- `csl`
+:::
+
+::: column
+### Execute
+- `freeze: true`
+- `warning: false`
+- `message: false`
+- `echo: true`
+:::
+
+::: column
+### Want more?
+- [Quarto Guidebook](https://quarto.org/docs/guide/)
+:::
+::::
+
+## Not only quarto, cultivate good R programming habits {.scrollable .smaller}
+
+:::: columns
+::: column
+### Git
+- version management
+- clear commit message
+- large files use Git LFS
+:::
+
+::: column
+### Files importing
+- `here` package
+- data acquisition written as a script
+- writing notes
+:::
+
+::: column
+### Saving result
+- `freeze: true`
+- .rda/.rds
+- `target::tar_load` `tar_read()`
+:::
+
+::: column
+### When computing
+- recording seed
+- R console and `debug()`
+- detecting CPU cores
+- controling by random stream
+:::
+::::
+
+# Making slides

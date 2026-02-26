@@ -1,0 +1,342 @@
+---
+title: "CBC: gtsummary and ggplot2"
+author: Jingzhe Zhang, Benjamin Langworthy
+institute: Department of Biostatistics, University of Minnesota
+format: 
+  html:
+    self-contained: true
+    code-fold: true
+    code-summary: "Code"
+bibliography: ../pruning.bib
+# csl: ../reflist2.csl
+execute:
+  warning: false
+  message: false
+  echo: true
+date: today
+---
+
+```{r setup}
+#| code-fold: false
+if (!requireNamespace("here", quietly = TRUE)) install.packages("here")
+setwd(here::here())
+```
+
+# gtsummary
+
+## Preparation
+
+The `gtsummary` package provides an elegant and flexible way to create publication-ready analytical and summary tables.
+
+```{r pkg}
+#| code-summary: "import data"
+library(tidyverse) #; theme_set(theme_bw())
+library(gtsummary)
+data(airquality)
+```
+
+```{r vis1}
+#| code-summary: "revealing"
+str(airquality)
+```
+
+```{r bin1}
+#| code-summary: "cleaning and creating binary indicator"
+aq <- airquality %>%
+  select(Ozone, Temp, Wind, Solar.R) %>%
+  na.omit() %>%
+  mutate(
+    high_ozone = ifelse(Ozone > 60, 1, 0)
+  )
+
+head(aq)
+```
+
+## Summarize
+
+The first useful function in `gtsummary` is `tbl_summary` , which can create a table of descriptive statistics. Below we go through examples of how to use `tbl_summary` to create summary tables. Below we highlight how it can be used to create summary tables, and highlight some of the functionality including changing variable labels, changing which statistic is reported, and presenting a table split out by a binary variable.
+
+```{r sum1}
+#| code-fold: false
+tbl_summary(aq)
+```
+
+By default `tbl_summary` reports the median (IQR) for continuous variables. We can change that to mean (sd) using the `statistic` option. We can also clean up the variable labels using the `label` option.
+
+```{r sum2}
+#| code-fold: false
+tbl_summary(aq,label = list(Solar.R ="Solar Radiation",high_ozone = "Ozone > 60"),statistic = list(all_continuous() ~ "{mean} ({sd})"))
+```
+
+If we want to split out the table by a categorical variable we can use the `by` option
+
+```{r sum3}
+#| code-fold: false
+tbl_summary(aq,label = list(Solar.R ="Solar Radiation"), by = high_ozone) 
+```
+
+Below we highlight different formatting options
+
+```{r sum4}
+#| code-fold: false
+tbl_summary(aq,label = list(Solar.R ="Solar Radiation"), by = high_ozone) %>%
+  modify_header(label = "**Variable**") %>% 
+  add_overall() %>% 
+  bold_labels()
+```
+
+## Statistical testing
+
+```{r test1}
+#| code-fold: false
+tbl_summary(aq, by = high_ozone) %>%
+  add_p()
+```
+
+If we want to report the mean (sd) and use the t.test instead of the Wilcoxon test we can use the options below.
+
+```{r test2}
+#| code-fold: false
+tbl_summary(aq, by = high_ozone,statistic = list(all_continuous() ~ "{mean} ({sd})")) %>% add_p(test = list(all_continuous() ~ "t.test")) 
+```
+
+## Linear model
+
+Above we show how we can use `gtsummary` for summary tables using `tbl_summary`. It can also be used to make well formatted tables of statistical model output. We fit a model with ozone as the outcome and temperature, wind, and solar radiation as covariates.
+
+```{r lm1}
+#| code-fold: false
+lm_fit <- lm(Ozone ~ Temp + Wind + Solar.R, data = aq)
+```
+
+### Regression
+
+`tbl_regression` converts the regression output into a cleanly presented table.
+
+```{r reg1}
+#| code-fold: false
+tbl_regression(
+  lm_fit,
+  estimate_fun = ~style_sigfig(.x, digits = 3) # without, default sig digit is 2
+)
+
+```
+
+```{r reg2}
+#| code-summary: "I don't know what is Solar R"
+# Similar to `tbl_summary` we can change the variable labels.
+tbl_lm <- tbl_regression(
+  lm_fit,label = list(Solar.R ="Solar Radiation"),
+  estimate_fun = ~style_sigfig(.x, digits = 3) # without, default sig digit is 2
+)
+
+tbl_lm
+```
+
+### Logistic model
+
+In addition to linear regression `tbl_regression` can handle most common models in R, such as `coxph` , and `lmer` . Here we will go through an example using logistic regression from `glm` .
+
+```{r log1}
+#| code-fold: false
+logit_fit <- glm(
+  high_ozone ~ Temp + Wind + Solar.R,
+  data = aq,
+  family = binomial
+)
+```
+
+Try to use `tbl_regression` function for a logistic regression!
+
+```{r log2}
+#| code-summary: "tbl_regression for logistic regression"
+tbl_regression(logit_fit)
+```
+
+The table above reports the coefficients on the logit scale, but in general we want to report the odds ratios instead. `gtsummary` can give us these automatically using the `exponentiate = TRUE` option. Note that this can be useful for other models, such as the Cox proportional hazards model.
+
+```{r log3}
+#| code-summary: "OR in raw scale"
+tbl_logit <- tbl_regression(
+  logit_fit,
+  exponentiate = TRUE, label = list(Solar.R ="Solar Radiation")
+)
+
+tbl_logit
+```
+
+### Merge
+
+In addition to output from simple models, `gtsummary` has useful options for combining the presentation of multiple models. One of these is `tbl_merge()` , which allows us to compare results horizontally across different models using a consistent table layout.
+
+```{r merge}
+#| code-fold: false
+tbl_merge(
+  tbls = list(tbl_lm, tbl_logit),
+  tab_spanner = c("**Linear Regression**", "**Logistic Regression**")
+)
+```
+
+### Stack
+
+Another example is `tbl_stack()` , which is ideal for presenting multiple related models in a single, readable table vertically.
+
+```{r stack}
+#| code-fold: false
+lm_fit1 <- lm(Ozone ~ Temp, data = aq)
+lm_fit2 <- lm(Ozone ~ Temp + Wind, data = aq)
+lm_fit3 <- lm(Ozone ~ Temp + Wind + Solar.R, data = aq)
+
+tbl_lm1 <- tbl_regression(lm_fit1)
+tbl_lm2 <- tbl_regression(lm_fit2)
+tbl_lm3 <- tbl_regression(lm_fit3)
+
+tbl_stack(
+  tbls = list(tbl_lm1, tbl_lm2, tbl_lm3),
+  group_header = c(
+    "**Model 1: Temp only**",
+    "**Model 2: Temp + Wind**",
+    "**Model 3: Full model**"
+  )
+)
+
+tbl_merge(
+  tbls = list(tbl_lm1, tbl_lm2, tbl_lm3)
+  #tab_spanner = c("**Linear Regression**", "**Logistic Regression**")
+)
+```
+
+# ggplot2
+
+```{r import2}
+#| code-summary: "import ggplot2"
+library(ggplot2)
+```
+
+In `ggplot2`, plots are constructed from three core components:
+
+-   **Data** -- the dataset being visualized
+-   **Aesthetics (`aes`)** -- what variables to map
+-   **Geometries (`geom_x`)** -- how data are displayed (points, bars, lines)
+
+
+## Example 1
+
+```{r vis3}
+#| code-summary: "histogram of a single variable"
+ggplot(aq, aes(x = Ozone)) +
+  geom_histogram(binwidth = 10) +
+  labs(
+    title = "Distribution of Ozone Levels",
+    x = "Ozone",
+    y = "Count"
+  )
+```
+
+### Example 2
+
+```{r vis4}
+#| code-summary: "scatter plot with regression line (use patchwork to show both)"
+library(patchwork)
+p1 <- ggplot(aq, aes(x = Temp, y = Ozone)) +
+  geom_point() +
+  geom_smooth(method = "lm", se = FALSE) +
+  labs(
+    title = "se = FALSE",
+    x = "Temperature",
+    y = "Ozone"
+  )
+
+p2 <- ggplot(aq, aes(x = Temp, y = Ozone)) +
+  geom_point() +
+  geom_smooth(method = "lm", se = TRUE) +
+  labs(
+    title = "se = TRUE",
+    x = "Temperature",
+    y = "Ozone"
+  )
+
+p1 | p2
+```
+
+## Example 3
+
+```{r vis5}
+#| code-summary: "another way to present multi-graphs when facing cateforical variable"
+ggplot(aq, aes(x = Temp, y = Ozone)) +
+  geom_point() +
+  facet_wrap(~ high_ozone) +
+  labs(
+    title = "Ozone vs Temperature by High-Ozone Group"
+  )
+```
+
+### Example 4
+
+```{r vis6}
+#| code-summary: "compare a continuous variable across two categories"
+p_box <- ggplot(aq, aes(x = factor(high_ozone), y = Ozone)) +
+  geom_boxplot() +
+  labs(
+    title = "Boxplot",
+    x = "High Ozone (0 = No, 1 = Yes)",
+    y = "Ozone (ppb)"
+  )
+
+p_violin <- ggplot(aq, aes(x = factor(high_ozone), y = Ozone)) +
+  geom_violin(trim = FALSE) +
+  geom_boxplot(width = 0.15, outlier.shape = NA) +
+  geom_jitter(width = 0.08, alpha = 0.4, size = 1) +
+  labs(
+    title = "Violin + Box + Points",
+    x = "High Ozone (0 = No, 1 = Yes)",
+    y = "Ozone (ppb)"
+  )
+
+p_box | p_violin
+```
+
+### Example 5
+
+```{r vis7}
+#| code-summary: "Visualizing logistic regression"
+ggplot(aq, aes(x = Temp, y = high_ozone)) +
+  geom_jitter(height = 0.03, width = 0) +
+  geom_smooth(
+    method = "glm",
+    method.args = list(family = binomial),
+    se = FALSE
+  ) +
+  labs(
+    title = "Probability of High Ozone vs Temperature",
+    x = "Temperature (°F)",
+    y = "Probability of High Ozone"
+  )
+```
+
+# Let's explore another dataset!
+
+`Seatbelts` [@harvey_effects_1986] is a multiple time series, with columns.\
+- **DriversKilled** - car drivers killed.\
+- **drivers** - monthly totals of car drivers in Great Britain killed or seriously injured.\
+- **front** - front-seat passengers killed or seriously injured.\
+- **rear** - rear-seat passengers killed or seriously injured.\
+- **kms** - distance driven.\
+- **PetrolPrice** - petrol price.\
+- **VanKilled** - number of van (‘light goods vehicle’) drivers.\
+- **law** - 0/1: was the law in effect that month? (law to enforce seatbelt).
+
+## Exploration Task 1: Summarize the dataset to get a better idea of it.
+
+## Exploration Task 2: Compare Front vs Rear Seat
+
+-   Which seat had more deaths?
+
+## Exploration Task 3: Relationship with Petrol Price
+
+-   Does petrol price affect the distance driven and drivers death?
+
+## Exploration Task 4: Before and after the enforcement of seatbelt
+
+-   Does the introduction of seatbelt law affect the number of driver's death?
+-   Does the proportion between front and reat seat injuries change?
