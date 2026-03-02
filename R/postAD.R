@@ -118,7 +118,8 @@ postAD <- function(tree, trait, state, pars,
                   jitter.sd = 0.5,
                   opt.args = NULL,
                   keep_all = FALSE,
-                  rng_misuse = c("warning","error","ignore")) {
+                  rng_misuse = c("warning","error","ignore"),
+                  return_obj = FALSE) {
 
   rng_misuse <- match.arg(rng_misuse)
 
@@ -189,7 +190,10 @@ postAD <- function(tree, trait, state, pars,
     parameters = list(log_trans_rates = pars),
     silent     = TRUE
   )
-
+  if (return_obj) {
+       return(ff0)
+  }
+    
   t6 <- proc.time()[["elapsed"]]
   res0 <- with(ff0, do.call(nlminb, c(list(ff0$par, ff0$fn, ff0$gr), opt.args)))
   t7 <- proc.time()[["elapsed"]]
@@ -269,3 +273,44 @@ res <- postAD(g1, 2, 2, log_trans_rates, multistart = 10, seed = 427)
 # [1] -1.3560630 -8.0470661 -3.2236295 -0.1622979 -8.0401864 -0.7608131 -1.1870146 -0.4633658
 # time:
 # [1] 11.44
+
+objfun <- postAD(g1, 2, 2, log_trans_rates, multistart = 10, seed = 427,
+                 return_obj = TRUE)
+
+## try starting value (just for kicks, don't need this)
+objfun$fn(objfun$par)
+
+library(tmbstan)
+
+options(mc.cores = 8)
+stanfit <- tmbstan(objfun, chains=8, iter = 8000, seed = 20260302)
+
+## https://bbolker.github.io/bbmisc/bayes/
+
+## diagnostics: R-hat, ESS, etc
+library(bayestestR)
+diagnostic_posterior(stanfit)
+
+## trace plots, ...
+library(bayesplot)
+mcmc_trace(stanfit)
+mcmc_rank_overlay(stanfit)
+
+## don't like this one ...
+## m <- mcmc_dens_chains(stanfit, regex_pars = "log_.*rate")
+
+## (univariate) marginal densities ...
+mcmc_dens_overlay(stanfit, regex_pars = "log_.*rate")
+
+## don't really like this, pairs() method is better (see below)
+## mcmc_pairs(stanfit, regex_pars = "log_.*rate")
+
+## library(shinystan)
+## launch_shinystan(stanfit)
+
+## bivariate marginal densities ...
+pairs(stanfit, gap = 0)  ## uses accept_prob to distinguish lower/upper triangle
+try(pairs(stanfit, condition = "divergent__", gap = 0))
+pairs(stanfit, gap = 0, condition = "stepsize__")
+
+## now try it with ray-finned fish example!
