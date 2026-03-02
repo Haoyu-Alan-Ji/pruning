@@ -314,3 +314,5 @@ try(pairs(stanfit, condition = "divergent__", gap = 0))
 pairs(stanfit, gap = 0, condition = "stepsize__")
 
 ## now try it with ray-finned fish example!
+## or ... could also try it (maybe first??) with some of the built-in corHMM
+##  examples, e.g. the primate example ...
