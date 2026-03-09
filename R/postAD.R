@@ -7,9 +7,6 @@ library(future)
 library(future.apply)
 library(parallel)
 
-setwd(here::here())
-source("R/pruning_funs.R")
-
 #' @param p parameters (log-hazard rates)
 #' @param lb lower bound(s) for baseline priors
 #' @param ub upper bound(s)
@@ -110,6 +107,15 @@ random_refit <- function(task, Phylodata, pars0, opt.args = NULL) {
   df
 }
 
+#' @examples
+#' set.seed(427)
+#' m3 <- rtree(20)
+#' g1 <- reorder(m3, "pruningwise")
+#' log_trans_rates <- log(abs(rnorm(8)))
+#' res <- postAD(g1, 2, 2, log_trans_rates, multistart = 10, seed = 427)
+#' @examples
+#' objfun <- postAD(g1, 2, 2, log_trans_rates, multistart = 10, seed = 427, return_obj = TRUE)
+#' objfun$fn(objfun$par)
 postAD <- function(tree, trait, state, pars,
                   traitMatrix = NULL,
                   multistart = 10,
@@ -261,58 +267,3 @@ postAD <- function(tree, trait, state, pars,
   cat('loglik cdf:\n'); plot(fn.cdf)
   out
 }
-
-set.seed(427)
-m3 <- rtree(20)
-g1 <- reorder(m3, "pruningwise")
-log_trans_rates <- log(abs(rnorm(8)))
-res <- postAD(g1, 2, 2, log_trans_rates, multistart = 10, seed = 427)
-# loglik:
-# [1] 56.66951
-# pars:
-# [1] -1.3560630 -8.0470661 -3.2236295 -0.1622979 -8.0401864 -0.7608131 -1.1870146 -0.4633658
-# time:
-# [1] 11.44
-
-objfun <- postAD(g1, 2, 2, log_trans_rates, multistart = 10, seed = 427,
-                 return_obj = TRUE)
-
-## try starting value (just for kicks, don't need this)
-objfun$fn(objfun$par)
-
-library(tmbstan)
-
-options(mc.cores = 8)
-stanfit <- tmbstan(objfun, chains=8, iter = 8000, seed = 20260302)
-
-## https://bbolker.github.io/bbmisc/bayes/
-
-## diagnostics: R-hat, ESS, etc
-library(bayestestR)
-diagnostic_posterior(stanfit)
-
-## trace plots, ...
-library(bayesplot)
-mcmc_trace(stanfit)
-mcmc_rank_overlay(stanfit)
-
-## don't like this one ...
-## m <- mcmc_dens_chains(stanfit, regex_pars = "log_.*rate")
-
-## (univariate) marginal densities ...
-mcmc_dens_overlay(stanfit, regex_pars = "log_.*rate")
-
-## don't really like this, pairs() method is better (see below)
-## mcmc_pairs(stanfit, regex_pars = "log_.*rate")
-
-## library(shinystan)
-## launch_shinystan(stanfit)
-
-## bivariate marginal densities ...
-pairs(stanfit, gap = 0)  ## uses accept_prob to distinguish lower/upper triangle
-try(pairs(stanfit, condition = "divergent__", gap = 0))
-pairs(stanfit, gap = 0, condition = "stepsize__")
-
-## now try it with ray-finned fish example!
-## or ... could also try it (maybe first??) with some of the built-in corHMM
-##  examples, e.g. the primate example ...
