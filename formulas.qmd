@@ -21,8 +21,13 @@ to denote that rates of gain/loss in `pc`, `sc` are independent of the other tra
 ```r
 list(ag ~ asymm(pc*sc), pc ~ asymm(1), sc ~ asymm(1))
 ```
-to denote that the rates are asymmetric (different parameters for gain and loss). Other possibilities would be `symm()` (symmetric), `directed()` (transitions only allowed in the direction of an ordered set of states; possibly allow "down" or "up"?). In principle it should also be possible to specify different models in each direction, `~pc*sc` for gains and `~1` for losses; not quite sure how to specify this. Maybe `list(ag = ~symm(pc*sc), pc = list(~1, ~sc), ...)` ?
+to denote that the rates are asymmetric (different parameters for gain and loss). Other possibilities would be `symm()` (symmetric), `directed()` (transitions only allowed in the direction of an ordered set of states; possibly allow "down" or "up"?). In principle it should also be possible to specify different models in each direction, `~pc*sc` for gains and `~1` for losses; not quite sure how to specify this. Maybe `list(ag = ~symm(pc*sc), pc = list(~1, ~sc), ...)` ? Want a reasonable compromise between consistency and simple defaults. (Use `sym`, `ard` `eq` for consistency with current corHMM "SYM"?
+
+How should all of this extend to covarion models (i.e. specifying what changes between covarion blocks)?
 
 * parse formulas
 * set up as many model matrices as necessary (model matrices are small so duplication shouldn't be a problem), e.g. one for gain/loss (not sure what to do about traits with many levels?)
 * set up machinery for partitioning a parameter vector, multiplying model frames by the corresponding sub-vector, and inserting the results into the appropriate elements of the $Q$ matrix ...
+
+If we don't need to allow for arbitrary nesting then we probably don't need `reformulas` machinery for recursive processing. Slightly easier to deal  with if make this a *named list* (e.g. `x = ~ form`) rather than an list with unnamed components (`x ~ form`), but the latter seems more natural ?
+
