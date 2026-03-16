@@ -2,9 +2,11 @@
 #' formula_test <- translate(list(ag ~ pc * sc, pc ~ 1, sc ~ 1))
 #' formula_test
 translate <- function(formula_list, nstate = 2) {
-  trait_names <- vapply(formula_list, \(f) as.character(f[[2]]), character(1)); names(formula_list) <- trait_names
+  trait_names <- vapply(formula_list, \(f) as.character(f[[2]]), character(1))
+  names(formula_list) <- trait_names
 
-  stateList <- rep.int(as.integer(nstate), length(trait_names)); names(stateList) <- trait_names
+  stateList <- rep.int(as.integer(nstate), length(trait_names))
+  names(stateList) <- trait_names
 
   traitMatrix <- do.call(expand.grid, lapply(stateList, function(x) 0:(x - 1)))
   traitMatrix$label <- do.call(paste, c(traitMatrix, sep = "|"))
@@ -107,13 +109,15 @@ build_Q <- function(theta, trans_output) {
   labs <- trans_output$traitMatrix$label
 
   Q0 <- matrix(0, ns, ns, dimnames = list(labs, labs))
-  Q <- RTMB::AD(Q0)
+  Q <- RTMB::AD(Q0)  ## convert base-R to RTMB/AD type
 
+  ## FIXME? should we construct Q once, then insert new values into the matrix
+  ##  during the optimization process? (Would still have to do -rowSums(Q))
   for (nm in names(trans_output$blocks)) {
     b <- trans_output$blocks[[nm]]
 
     beta_block <- theta[b$par_index]
-    eta_block  <- as.vector(b$X %*% beta_block)
+    eta_block  <- drop(b$X %*% beta_block)
     rate_block <- exp(eta_block)
 
     idx <- cbind(b$from, b$to)
@@ -148,6 +152,11 @@ prune_nll <- function(pars, Phylodata) {
   "c" <- ADoverload("c")
   "diag<-" <- ADoverload("diag<-")
   getAll(pars, Phylodata)
+
+  ## FIXME: rearrange so that simSeq and build_Q (without computing values to insert)
+  ## should be outside of the function that will be passed to MakeADFun()
+  ## i.e. they should be part of Phylodata instead
+
   d <- nrow(translate_F$traitMatrix)
   repeat {
       s <- phangorn::simSeq(tree, l = 1, Q = formula_test$Q_indicator,
@@ -156,8 +165,9 @@ prune_nll <- function(pars, Phylodata) {
     }
   trait_values <- as.numeric(unlist(s))
 
-  Q <- build_Q(theta, translate_F)
   
+  Q <- build_Q(theta, translate_F)
+
   liks <- matrix(NA, nrow = ape::Ntip(tree) + tree$Nnode, ncol = d)
   ntips <- length(trait_values)
   ## FIXME: this can be generalized (for polymorphic/unknown states),
@@ -180,8 +190,9 @@ prune_nll <- function(pars, Phylodata) {
       childlik <- matrix(liks[desNodes[j], ], ncol = 1)
       P <- Matrix::expm(Q * t)     
       u <- drop(P %*% childlik)
-      v <- drop(v * u)
-          }
+      ## need as.matrix() to make drop() work properly
+      v <- drop(as.matrix(v * u))
+    }
     comp[i] <- sum(v)
     liks[i, ] <- v / comp[i]
   }
@@ -192,4 +203,50 @@ prune_nll <- function(pars, Phylodata) {
   return(neg_loglik)
 }
 
-t <- prune_nll(theta_test, pdat)
+if (FALSE) {
+    formula_test <- translate(list(ag ~ pc*sc, pc ~ 1, sc ~ 1))
+    v <- c(
+        ## ag_gain: 2 -> 6 (x3) -> 10 (x5) -> 60 (x2)
+        "ag_gain:(Intercept)" = log(2), "ag_gain:pc" = log(3), "ag_gain:sc" = log(5), "ag_gain:pc:sc" = log(2),
+        ## ag_loss: 7 -> 14 (x2) -> 21 (x3) -> 84 (x2)
+        "ag_loss:(Intercept)" = log(7), "ag_loss:pc" = log(2), "ag_loss:sc" = log(3), "ag_loss:pc:sc" = log(2),
+        ## pc/sc gain/loss constant
+        "pc_gain:(Intercept)" = log(11), "pc_loss:(Intercept)" = log(12),
+        "sc_gain:(Intercept)" = log(13), "sc_loss:(Intercept)" = log(17)
+    )
+    
+    theta_test <- setNames(numeric(formula_test$n_par), formula_test$par_names)
+    theta_test[names(v)] <- v
+    Q <- build_Q(theta_test, formula_test)
+
+    ## general debugging approach:
+    ##
+    ## see where we hit an error
+    ## traceback()  to see the call stack
+    ## options(error=recover) to drop into the browser at the appropriate point
+    ##  (this isn't always convenient, otherwise I would debug() a function near the
+    ##   point of error and step forward from there)
+    ## pick
+    ## inspect values present in the environment ...
+    ## try to figure out what's wrong ...
+    set.seed(101)
+    testval <- prune_nll(list(theta = theta_test), pdat)
+    
+
+
+    ff <- RTMB::MakeADFun(
+                    func = cmb(prune_nll, pdat),
+                    parameters = list(theta = theta_test),
+                    silent = TRUE
+                )
+
+    ff$fn()
+    ff$gr()
+    opt1 <- with(ff, nlminb(par, fn, gr))
+    ## ridiculous answer, but probably as expected ...
+    
+    ## testing Matrix coercion/drop/etc.
+    m <- Matrix::Matrix(cbind(1:3))
+    drop(m) ## doesn't work!
+    drop(as.matrix(m)) ## maybe this will work?
+}
