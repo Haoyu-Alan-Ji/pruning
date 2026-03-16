@@ -1,5 +1,8 @@
 ---
 title: "a formula interface for corHMM $Q$ matrices"
+format:
+  html:
+    embed-resources: true
 ---
 
 For multi-trait models (where the state vector consists of combinations of categories of different traits) we'd like to be able to use Wilkinson-Rogers-like formulas to specify a mapping from model parameters to the elements of $Q$ matrices. This will have several benefits:
@@ -12,13 +15,13 @@ In general we want to be able to specify the dependence of rates of change of on
 
 Taking the model from Eckert et al., where we have traits `ag` (accessory glands), `pc` (parental care), `sc` (spawning mode/sperm competition). The main model used in the paper would be specified as
 
-```r
+```{r ex1}
 list(ag ~ pc*sc, pc ~ 1, sc ~ 1)
 ```
 
 to denote that rates of gain/loss in `pc`, `sc` are independent of the other traits, and `ag` gain/loss are different in every (`pc` × `sc`) state. More specifically we could call this
 
-```r
+```{r ex2}
 list(ag ~ asymm(pc*sc), pc ~ asymm(1), sc ~ asymm(1))
 ```
 to denote that the rates are asymmetric (different parameters for gain and loss). Other possibilities would be `symm()` (symmetric), `directed()` (transitions only allowed in the direction of an ordered set of states; possibly allow "down" or "up"?). In principle it should also be possible to specify different models in each direction, `~pc*sc` for gains and `~1` for losses; not quite sure how to specify this. Maybe `list(ag = ~symm(pc*sc), pc = list(~1, ~sc), ...)` ? Want a reasonable compromise between consistency and simple defaults. (Use `sym`, `ard` `eq` for consistency with current corHMM "SYM"?
@@ -31,3 +34,36 @@ How should all of this extend to covarion models (i.e. specifying what changes b
 
 If we don't need to allow for arbitrary nesting then we probably don't need `reformulas` machinery for recursive processing. Slightly easier to deal  with if make this a *named list* (e.g. `x = ~ form`) rather than an list with unnamed components (`x ~ form`), but the latter seems more natural ?
 
+Assume that our input is a data frame `data` with trait values
+
+```{r test1}
+source("R/pruning_funs.R")
+library(Matrix)
+library(latticeExtra)
+ifun <- function(X) {
+  sc <- list(x = list(at = 1:ncol(X), labels = colnames(X)),
+             y = list(at = 1:nrow(X), labels = rownames(X)))
+  image(Matrix(X), scales = sc, xlab = "", ylab  = "",
+        title = "", sub = "")
+}
+## would like to overlay numeric labels but that's hard
+## values are labeled in columnwise order
+ifun(Q_template())
+```
+
+* which elements correspond to which transitions? 
+* correspondence between non-focal state values and elements ... e.g. in this example the gains in trait 1 (`ag`) are elements 1, 8, 14, 21 ...
+* construct all combinations of non-focal traits (`expand.grid`)
+* construct model matrix for these combinations (`model.matrix`)
+* multiply param vector by this model matrix
+* insert
+
+e.g.
+
+```{r}
+all_traits <- expand.grid(ag = factor(0:1), sc = factor(0:1), pc = factor(0:1))
+form <- ag ~ sc+pc
+nonfocal_data <- unique(all_traits[,-1])
+X <- model.matrix(form[-2], data = nonfocal_data)
+drop(X %*% c(1:3))
+```
