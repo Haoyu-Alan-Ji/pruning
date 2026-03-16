@@ -1,8 +1,8 @@
 #' @param n (vector of) number of states (if n is a scalar, all traits have the same number of states)
 #' @param k number of traits (only used if n is a scalar)
 #' @examples
-#' setup_Q_template(n = 3, k = 2)
-#' setup_Q_template(n = 2, k = 3)
+#' Q_template(n = 3, k = 2)
+#' Q_template(n = 2, k = 3)
 Q_template <- function(n=2, k= 3, set_indices = TRUE) {
   if (length(n) == 1) {
     n <- rep(n, k)
@@ -96,13 +96,3 @@ prune_nll <- function(pars, Phylodata) {
   return(neg_loglik)
 }
 
-random_refit <- function(ff) {
-  n <- length(ff$par)
-  start <- log(abs(rnorm(n)))
-  res <- with(ff, nlminb(start, fn, gr))
-  names(start) <- paste0("start", seq_along(start))
-  fitted <-  res$par
-  names(fitted) <- paste0("fitted", seq_along(fitted))
-  with(res, data.frame(objective, convergence, message,
-                       rbind(start), rbind(fitted)))
-}
