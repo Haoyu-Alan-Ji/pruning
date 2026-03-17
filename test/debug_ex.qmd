@@ -1,0 +1,95 @@
+---
+title: "bmb `drop()` debug"
+author: "Haoyu Ji"
+format: 
+  html:
+    code-tools: true
+    df-print: paged
+    self-contained: true
+    code-fold: false
+    code-summary: "Code"
+execute:
+  echo: true
+  warning: false
+  message: false   
+date: today
+---
+
+```{r pkgs}
+if (!requireNamespace("here", quietly = TRUE)) install.packages("here")
+library(Matrix)
+library(ape)
+library(tidyverse); theme_set(theme_bw())
+library(expm)
+library(RTMB)
+```
+
+```{r seed}
+set.seed(427)
+```
+
+```{r funs}
+## corHMM version
+## https://github.com/bbolker/corHMM/blob/bolker_clean/misc/test_RTMB.R
+## remotes::install_github("bbolker/corHMM", ref = "bolker_clean")
+source(here::here("R", "formula_interface.R"))
+```
+
+```{r dat}
+m3 <- ape::rtree(20)
+g1 <- reorder(m3, "pruningwise")
+
+formula_test <- translate(list(ag ~ pc*sc, pc ~ 1, sc ~ 1))
+v <- c(
+## ag_gain: 2 -> 6 (x3) -> 10 (x5) -> 60 (x2)
+"ag_gain:(Intercept)" = log(2), "ag_gain:pc" = log(3), "ag_gain:sc" = log(5), "ag_gain:pc:sc" = log(2),
+## ag_loss: 7 -> 14 (x2) -> 21 (x3) -> 84 (x2)
+"ag_loss:(Intercept)" = log(7), "ag_loss:pc" = log(2), "ag_loss:sc" = log(3), "ag_loss:pc:sc" = log(2),
+## pc/sc gain/loss constant
+"pc_gain:(Intercept)" = log(11), "pc_loss:(Intercept)" = log(12),
+"sc_gain:(Intercept)" = log(13), "sc_loss:(Intercept)" = log(17)
+)
+theta_test <- setNames(numeric(formula_test$n_par), formula_test$par_names)
+theta_test[names(v)] <- v
+Q <- build_Q(theta_test, formula_test)
+
+d <- nrow(formula_test$traitMatrix)
+repeat {
+    s <- phangorn::simSeq(g1, l = 1, Q = formula_test$Q_indicator,
+                          type = "USER", levels = seq_len(d), rate = 1)
+    if (nrow(unique(as.character(s))) == d) break
+  }
+s <- as.numeric(unlist(s))
+
+pdat <- list(translate_F = formula_test, tree= g1, trait_values = s)
+```
+
+```{r Debug}
+## general debugging approach:
+##
+## see where we hit an error
+## traceback()  to see the call stack
+## options(error=recover) to drop into the browser at the appropriate point
+##  (this isn't always convenient, otherwise I would debug() a function near the
+##   point of error and step forward from there)
+## pick
+## inspect values present in the environment ...
+## try to figure out what's wrong ...
+testval <- prune_nll(list(theta = theta_test), pdat)
+
+ff <- RTMB::MakeADFun(
+            func = cmb(prune_nll, pdat),
+            parameters = list(theta = theta_test),
+            silent = TRUE
+        )
+
+ff$fn()
+ff$gr()
+opt1 <- with(ff, nlminb(par, fn, gr))
+## ridiculous answer, but probably as expected ...
+
+## testing Matrix coercion/drop/etc.
+m <- Matrix::Matrix(cbind(1:3))
+drop(m) ## doesn't work!
+drop(as.matrix(m)) ## maybe this will work?
+```
