@@ -118,7 +118,6 @@ build_Q <- function(theta, trans_output) {
   if (length(theta) != trans_output$n_par) {
     stop("Length of theta (", length(theta), ") does not match trans_output$n_par (", trans_output$n_par, ")." )
   }
-
   Q <- RTMB::AD(trans_output$Q0)
   for (nm in names(trans_output$blocks)) {
     b <- trans_output$blocks[[nm]]
@@ -130,7 +129,6 @@ build_Q <- function(theta, trans_output) {
     idx <- cbind(b$from, b$to)
     Q[idx] <- rate_block
   }
-
   diag(Q) <- -rowSums(Q)
   Q
 }
