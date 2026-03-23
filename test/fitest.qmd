@@ -82,12 +82,8 @@ sum_postAD <- function(ntrait = 3, ntaxa = 200, state = 2, seed = NULL,
   ss <- realfun(raw_traitM = traitMatrix, raw_tree = realtree) 
 
   qprep_rates <- Q_prep(mode = "rates", nstate = state, ntrait = ntrait)
-  if (is.null(pars_rates)) pars_rates <- setNames(rep(log(0.2), qprep_rates$n_par), qprep_rates$par_names)
-  
   qprep_formula <- Q_prep(mode = "formula", formula_list = formula_list, nstate = state)
-  if (is.null(pars_formula)) pars_formula <- setNames(rep(0, qprep_formula$n_par), qprep_formula$par_names)
   
-
   fit_rates <- postfitfun(ss, trait = ntrait, state = state, pars = pars_rates, mode = "rates", ...)
   fit_formula <- postfitfun(ss, trait = ntrait, state = state, pars = pars_formula, mode = "formula", formula_list = formula_list, ...)
 
@@ -104,8 +100,11 @@ sum_postAD <- function(ntrait = 3, ntaxa = 200, state = 2, seed = NULL,
 ```
 
 ```{r, eval = FALSE}
+pars_rates <- rep(log(0.2), 24)
+pars_formula <- rep(0, 12)
 sum1 <- sum_postAD(ntrait = 3, ntaxa = 200, state = 2, seed = 22,
                        traitMatrix = c_traits, realtree = c_tree,
+                       pars_rates = pars_rates, pars_formula = pars_formula,
                        formula_list = list(ag ~ pc * sc, pc ~ 1, sc ~ 1))
 ```
 
