@@ -1,0 +1,142 @@
+---
+title: "bmb `drop()` debug"
+author: "Haoyu Ji"
+format: 
+  html:
+    code-tools: true
+    df-print: paged
+    self-contained: true
+    code-fold: false
+    code-summary: "Code"
+execute:
+  echo: true
+  warning: false
+  message: false   
+date: today
+---
+
+```{r pkgs}
+if (!requireNamespace("here", quietly = TRUE)) install.packages("here")
+library(Matrix)
+library(ape)
+library(tidyverse); theme_set(theme_bw())
+library(expm)
+library(RTMB)
+library(colorspace)
+```
+
+```{r seed}
+set.seed(427)
+```
+
+```{r funs}
+## corHMM version
+## https://github.com/bbolker/corHMM/blob/bolker_clean/misc/test_RTMB.R
+## remotes::install_github("bbolker/corHMM", ref = "bolker_clean")
+source(here::here("R", "postAD.R"))
+source(here::here("R", "general.R"))
+source(here::here("R", "realtree.R"))
+```
+
+```{r realdat}
+#| code-summary: "import data"
+fish_traits <- read.csv(here::here('data', "binaryTraitData.csv"))
+fish_tree   <- readRDS(here::here('data', "treeSingle.rds"))
+```
+
+```{r clean3traits}
+#| code-summary: "data cleaning"
+ctraits <- fish_traits[fish_traits$species %in% fish_tree$tip.label, ]
+
+ctraits <- ctraits[match(fish_tree$tip.label, ctraits$species), ]
+
+c_traits <- data.frame(
+  Species = ctraits$species,
+  ag = ctraits$ag,
+  care = ctraits$care,
+  spawning = ctraits$spawning
+)
+
+c_traits <- c_traits[!is.na(c_traits$care) & !is.na(c_traits$spawning), ]
+c_tree <- drop.tip(fish_tree, setdiff(fish_tree$tip.label, c_traits$Species))
+
+c_traits <- c_traits[match(c_tree$tip.label, c_traits$Species), ]
+```
+
+```{r}
+postfitfun <- function(dat, trait, state, pars, mode = c("rates", "formula"), formula_list = NULL, ...) {
+  mode <- match.arg(mode)
+  trait_only <- dat$data[, -1, drop = FALSE]
+  tt <- system.time(invisible(capture.output(suppressWarnings(x <- with(dat, postAD(tree = tree, traitMatrix = trait_only, trait = trait, state = state, pars = pars, mode = mode, formula_list = formula_list, multistart = 1,...))))))
+  attr(x, "time") <- tt
+  x
+}
+
+sum_postAD <- function(ntrait = 3, ntaxa = 200, state = 2, seed = NULL,
+                       traitMatrix = NULL, realtree = NULL,
+                       formula_list = list(ag ~ pc * sc, pc ~ 1, sc ~ 1),
+                       pars_rates = NULL, pars_formula = NULL, ...) {
+  if (!is.null(seed)) set.seed(seed)
+  seed <- seed %||% NA
+
+  ss <- realfun(raw_traitM = traitMatrix, raw_tree = realtree) 
+
+  qprep_rates <- Q_prep(mode = "rates", nstate = state, ntrait = ntrait)
+  if (is.null(pars_rates)) pars_rates <- setNames(rep(log(0.2), qprep_rates$n_par), qprep_rates$par_names)
+  
+  qprep_formula <- Q_prep(mode = "formula", formula_list = formula_list, nstate = state)
+  if (is.null(pars_formula)) pars_formula <- setNames(rep(0, qprep_formula$n_par), qprep_formula$par_names)
+  
+
+  fit_rates <- postfitfun(ss, trait = ntrait, state = state, pars = pars_rates, mode = "rates", ...)
+  fit_formula <- postfitfun(ss, trait = ntrait, state = state, pars = pars_formula, mode = "formula", formula_list = formula_list, ...)
+
+  data.frame(
+    seed, ntrait, ntaxa,
+    rates_opt.time = fit_rates$time_total,
+    formula_opt.time = fit_formula$time_total,
+    rates_obj = fit_rates$obj.best,
+    formula_obj = fit_formula$obj.best,
+    rates_grad_norm = sqrt(sum(fit_rates$gr.best^2)),
+    formula_grad_norm = sqrt(sum(fit_formula$gr.best^2))
+  )
+}
+```
+
+```{r, eval = FALSE}
+sum1 <- sum_postAD(ntrait = 3, ntaxa = 200, state = 2, seed = 22,
+                       traitMatrix = c_traits, realtree = c_tree,
+                       formula_list = list(ag ~ pc * sc, pc ~ 1, sc ~ 1))
+```
+
+```{r getdat, eval = FALSE}
+#| code-summary: "resampling and running"
+ntaxvec <- as.numeric(45:234)
+
+dd <- expand.grid(seed = 101:104, ntaxa  = ntaxvec, ntrait = 3, model = "ARD", rate.cat = 1) |>
+  transform(model = as.character(model))
+
+res <- list()
+
+for (i in seq_len(nrow(dd))) {
+  cat(sprintf("\rRunning %d/%d", i, nrow(dd)))
+  flush.console()
+
+  ntaxa_i <- dd$ntaxa[i]
+  sub <- sample_subtree(tree = c_tree, traits = c_traits, ntaxa  = ntaxa_i)
+
+  args_i <- c(
+    as.list(dd[i, ]),   
+    list(
+      traitMatrix = sub$traits, 
+      realtree = sub$tree 
+    )
+  )
+
+  res[[i]] <- do.call(sumfun, args_i)
+}
+
+res_df <- do.call(rbind, res)
+saveRDS(res_df, file = here::here("data", "trait3_subtree.rds"))
+```
+

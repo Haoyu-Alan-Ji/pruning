@@ -19,6 +19,7 @@ realfun <- function(nstate = 2, raw_traitM, raw_tree) {
 #' o1 <- sample_subtree(c_tree, c_traits, 50)
 #' corHMM(phy = o1$tree, data = o1$traits, rate.cat = 1, use_RTMB = TRUE)
 sample_subtree <- function(tree, traits, ntaxa) {
+  require(ape)
   
   if (ntaxa > Ntip(tree)) {
     stop("ntaxa is greater than nodes")
@@ -27,6 +28,7 @@ sample_subtree <- function(tree, traits, ntaxa) {
   keep_tips <- sample(tree$tip.label, ntaxa)
   
   sub_tree <- drop.tip(tree, setdiff(tree$tip.label, keep_tips))
+  sub_tree <- reorder(sub_tree, "pruningwise")
   
   sub_traits <- traits[traits$Species %in% sub_tree$tip.label, ]
   sub_traits <- sub_traits[match(sub_tree$tip.label, sub_traits$Species), ]

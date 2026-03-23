@@ -1,0 +1,236 @@
+---
+title: "bmb `drop()` debug"
+author: "Haoyu Ji"
+format: 
+  html:
+    code-tools: true
+    df-print: paged
+    self-contained: true
+    code-fold: false
+    code-summary: "Code"
+execute:
+  echo: true
+  warning: false
+  message: false   
+date: today
+---
+
+```{r pkgs}
+if (!requireNamespace("here", quietly = TRUE)) install.packages("here")
+library(Matrix)
+library(ape)
+library(tidyverse); theme_set(theme_bw())
+library(expm)
+library(RTMB)
+```
+
+```{r seed}
+set.seed(427)
+```
+
+```{r funs}
+## corHMM version
+## https://github.com/bbolker/corHMM/blob/bolker_clean/misc/test_RTMB.R
+## remotes::install_github("bbolker/corHMM", ref = "bolker_clean")
+source(here::here("R", "formula_interface.R"))
+```
+
+```{r dat}
+m3 <- ape::rtree(20)
+g1 <- reorder(m3, "pruningwise")
+
+formula_test <- translate(list(ag ~ pc*sc, pc ~ 1, sc ~ 1))
+v <- c(
+## ag_gain: 2 -> 6 (x3) -> 10 (x5) -> 60 (x2)
+"ag_gain:(Intercept)" = log(2), "ag_gain:pc" = log(3), "ag_gain:sc" = log(5), "ag_gain:pc:sc" = log(2),
+## ag_loss: 7 -> 14 (x2) -> 21 (x3) -> 84 (x2)
+"ag_loss:(Intercept)" = log(7), "ag_loss:pc" = log(2), "ag_loss:sc" = log(3), "ag_loss:pc:sc" = log(2),
+## pc/sc gain/loss constant
+"pc_gain:(Intercept)" = log(11), "pc_loss:(Intercept)" = log(12),
+"sc_gain:(Intercept)" = log(13), "sc_loss:(Intercept)" = log(17)
+)
+theta_test <- setNames(numeric(formula_test$n_par), formula_test$par_names)
+theta_test[names(v)] <- v
+Q <- build_Q(theta_test, formula_test)
+
+d <- nrow(formula_test$traitMatrix)
+repeat {
+    s <- phangorn::simSeq(g1, l = 1, Q = formula_test$Q_indicator,
+                          type = "USER", levels = seq_len(d), rate = 1)
+    if (nrow(unique(as.character(s))) == d) break
+  }
+s <- as.numeric(unlist(s))
+
+pdat <- list(translate_F = formula_test, tree= g1, trait_values = s)
+```
+
+```{r Debug}
+## general debugging approach:
+##
+## see where we hit an error
+## traceback()  to see the call stack
+## options(error=recover) to drop into the browser at the appropriate point
+##  (this isn't always convenient, otherwise I would debug() a function near the
+##   point of error and step forward from there)
+## pick
+## inspect values present in the environment ...
+## try to figure out what's wrong ...
+testval <- prune_nll(list(theta = theta_test), pdat)
+
+ff <- RTMB::MakeADFun(
+            func = cmb(prune_nll, pdat),
+            parameters = list(theta = theta_test),
+            silent = TRUE
+        )
+
+ff$fn()
+ff$gr()
+opt1 <- with(ff, nlminb(par, fn, gr))
+## ridiculous answer, but probably as expected ...
+
+## testing Matrix coercion/drop/etc.
+m <- Matrix::Matrix(cbind(1:3))
+drop(m) ## doesn't work!
+drop(as.matrix(m)) ## maybe this will work?
+```
+
+This debugging session started from the observation that `prune_nll()` could be evaluated in ordinary numeric mode, but failed when passed to `RTMB::MakeADFun()`. In other words, the problem was not a standard numerical error in the likelihood calculation itself, but a failure that appeared only during tape construction in the automatic differentiation (AD) environment.
+
+The initial traceback repeatedly pointed to the line
+
+```{r, eval = FALSE}
+u <- drop(P %*% childlik)
+```
+
+where
+
+```{r, eval = FALSE}
+P <- Matrix::expm(Q * t)
+childlik <- matrix(liks[desNodes[j], ], ncol = 1)
+```
+
+This suggested that the failure occurred during the propagation of conditional likelihoods from a child node to its parent.
+
+## First hypothesis: `drop()` and unstable dimensions
+
+The first suspicion was that the issue came from repeated switching between scalar, vector, and matrix representations. In the original code, v was initialized as
+
+```{r, eval = FALSE}
+v <- 1
+```
+
+and later updated through elementwise multiplication with a vector. This raised the possibility that dimension dropping or recycling was behaving differently under AD.
+
+A simple test confirmed that `drop()` does not behave reliably on `Matrix` objects:
+
+```{r, eval = FALSE}
+m <- Matrix::Matrix(cbind(1:3))
+drop(m)              # fails
+drop(as.matrix(m))   # works
+```
+
+This led to a local fix in which the result was first coerced to a base matrix before applying `drop()`, for example
+
+```{r, eval = FALSE}
+v <- drop(as.matrix(v * u))
+```
+
+This resolved some symptoms, but it did not remove the main error. Even after replacing outer `drop()` calls with `as.vector()`, the traceback still failed at
+
+```{r, eval = FALSE}
+P %*% childlik
+```
+
+This showed that the real problem was not in post-processing the product, but in the matrix multiplication itself.
+
+## Second step: isolate the minimal failing example
+
+To determine whether the problem was caused by the pruning recursion or by the matrix exponential path itself, I removed the tree recursion entirely and constructed a minimal test function containing only
+
+```{r, eval = FALSE}
+P <- Matrix::expm(Q * t)
+P %*% childlik
+```
+
+That reduced test still failed inside `RTMB::MakeADFun()`. This was an important result, because it showed that the pruning recursion was not the source of the problem. The failure could be localized to the combination of construction of an AD-valued rate matrix `Q`, evaluation of `Matrix::expm(Q * t)`, and multiplication of the result by a likelihood vector. 
+
+## Third hypothesis: AD class propagation from `Q0`
+
+At that stage I also considered whether the problem was made worse by converting `Q0` to an AD object inside `translate()`. That design meant that the template matrix entered the AD pathway very early, and all later operations on Q inherited that class structure.
+
+This was probably a contributing factor, but not the full explanation. Even if `Q0` were kept numeric in `translate()`, `Q` would still become AD-valued once `theta` entered `MakeADFun()`. So the deeper issue was not simply “AD too early”, but rather the interaction between AD-valued matrices, `Matrix::expm()`, and overloaded linear algebra operations.
+
+Since the problematic path seemed to be
+
+```{r, eval = FALSE}
+P <- Matrix::expm(Q * t)
+P %*% childlik
+```
+
+I then tried the RTMB helper `expAv()`, which computes `expm(A) %*% v` directly. The idea was to avoid explicitly constructing P. A test version was written as
+
+```{r, eval = FALSE}
+test_expm_mul2 <- function(pars, Phylodata) {
+  if (!require("RTMB")) stop("install RTMB package")
+  "[<-" <- ADoverload("[<-")
+  "c" <- ADoverload("c")
+  "diag<-" <- ADoverload("diag<-")
+  getAll(pars, Phylodata)
+
+  d <- nrow(translate_F$traitMatrix)
+  Q <- build_Q(theta, translate_F)
+  t <- tree$edge.length[1]
+
+  childlik <- rep(1, d)
+  Qsp <- Matrix::Matrix(Q, sparse = TRUE)
+
+  sum(RTMB::expAv(Qsp * t, childlik))
+}
+```
+
+This did not reach `expAv()`, because it failed earlier at
+
+```{r, eval = FALSE}
+Qsp <- Matrix::Matrix(Q, sparse = TRUE)
+```
+
+with the error
+
+```{r, eval = FALSE}
+Error in Matrix::Matrix():
+! invalid 'data'
+```
+
+This established another important fact: once `Q` had already become an RTMB AD object, it could no longer be passed to `Matrix::Matrix()` for sparse conversion. In other words, sparse coercion had to happen before AD conversion, not after it.
+
+## Structural conclusion: sparse first, AD second
+
+This led to the main design conclusion from the debugging process:
+
+If the final implementation is intended to use sparse matrices together with RTMB automatic differentiation, then the sparse structure must be introduced at the template stage. One cannot first build a dense AD matrix and then coerce it to sparse form afterward.
+
+The wrong order was essentially
+
+```{r, eval = FALSE}
+Q0 <- matrix(...)
+Q0 <- AD(Q0)
+Q <- build_Q(...)
+Qsp <- Matrix::Matrix(Q, sparse = TRUE)   # fails
+```
+
+Whereas the correct strategy is conceptually
+
+```{r, eval = FALSE}
+Q0_sparse <- Matrix::Matrix(0, ns, ns, sparse = TRUE)
+Q <- AD(Q0_sparse)
+```
+
+and then fill the entries of Q within that sparse AD structure.
+
+- First, a local fix such as `drop(as.matrix(...))` can be useful for identifying where the problem surfaces, but such fixes do not necessarily address the underlying cause.
+
+- Second, when debugging RTMB code, object class is as important as numerical value. The relevant distinctions are not only between correct and incorrect numbers, but also between base matrices, `Matrix` objects, dense AD objects, and sparse AD objects.
+
+- Third, a function that runs correctly in ordinary numeric mode is not necessarily valid inside `MakeADFun()`. Passing code through tape construction introduces a different execution pathway, with overloaded versions of assignment, matrix multiplication, diagonal replacement, and matrix exponentiation.
+
+- Finally, if sparse linear algebra is going to be part of the final implementation, it should be designed into the representation from the beginning. Sparse structure is not something to add at the very end by coercion.

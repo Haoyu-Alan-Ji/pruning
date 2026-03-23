@@ -35,8 +35,8 @@ set.seed(427)
 ## corHMM version
 ## https://github.com/bbolker/corHMM/blob/bolker_clean/misc/test_RTMB.R
 ## remotes::install_github("bbolker/corHMM", ref = "bolker_clean")
-source(here::here("R", "Q_template.R"))
-source(here::here("R", "getinfo.R"))
+source(here::here("R", "pruning_funs.R"))
+source(here::here("R", "corHMM_sim.R"))
 source(here::here("R", "realtree.R"))
 ```
 

@@ -197,7 +197,8 @@ prune_nll <- function(pars, Phylodata) {
       t <- tree$edge.length[desRows[j]]
       childlik <- matrix(liks[desNodes[j], ], ncol = 1)
       P <- Matrix::expm(Q * t)     
-      u <- drop(P %*% childlik) # try u <- RTMB::expAv(Q * t, as.vector(childlik))??
+      ## FIXME: try u <- RTMB::expAv(Q * t, as.vector(childlik))??
+      u <- drop(P %*% childlik)
       ## need as.matrix() to make drop() work properly 
       v <- drop(as.matrix(v * u))
     }
@@ -210,3 +211,92 @@ prune_nll <- function(pars, Phylodata) {
   neg_loglik <- -1*(sum(log(comp[-TIPS])) + log(sum(root.p * liks[root, ])))
   return(neg_loglik)
 }
+
+
+
+
+make_prune_problem <- function(tree, trait_values,
+                               mode = c("rates", "formula"),
+                               formula_list = NULL,
+                               nstate = 2L,
+                               Q_template = NULL,
+                               start = NULL) {
+  mode <- match.arg(mode)
+
+  q_spec <- prepare_q_spec(
+    mode = mode,
+    formula_list = formula_list,
+    nstate = nstate,
+    Q_template = Q_template
+  )
+
+  par0 <- setNames(numeric(q_spec$n_par), q_spec$par_names)
+
+  if (!is.null(start)) {
+    if (is.null(names(start))) {
+      if (length(start) != length(par0)) {
+        stop("Unnamed start vector has wrong length.")
+      }
+      par0[] <- start
+    } else {
+      par0[names(start)] <- start
+    }
+  }
+
+  pdat <- list(
+    tree = tree,
+    trait_values = trait_values,
+    q_spec = q_spec
+  )
+
+  list(
+    pdat = pdat,
+    par0 = par0,
+    q_spec = q_spec
+  )
+}
+
+make_prune_objective <- function(tree, trait_values,
+                                 mode = c("rates", "formula"),
+                                 formula_list = NULL,
+                                 nstate = 2L,
+                                 Q_template = NULL,
+                                 start = NULL,
+                                 silent = TRUE) {
+  prob <- make_prune_problem(
+    tree = tree,
+    trait_values = trait_values,
+    mode = mode,
+    formula_list = formula_list,
+    nstate = nstate,
+    Q_template = Q_template,
+    start = start
+  )
+
+  obj <- RTMB::MakeADFun(
+    func = cmb(prune_nll_general, prob$pdat),
+    parameters = list(q_par = prob$par0),
+    silent = silent
+  )
+
+  list(
+    obj = obj,
+    pdat = prob$pdat,
+    q_spec = prob$q_spec,
+    par0 = prob$par0
+  )
+}
+
+Qtemp <- Q_template(n = 2, k = 3)
+
+fit1 <- make_prune_objective(
+  tree = g1,
+  trait_values = s,
+  mode = "rates",
+  Q_template = Qtemp,
+  silent = TRUE
+)
+
+fit1$obj$fn()
+fit1$obj$gr()
+opt1 <- with(fit1$obj, nlminb(par, fn, gr))
