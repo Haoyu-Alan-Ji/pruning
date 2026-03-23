@@ -200,7 +200,7 @@ prune_nll <- function(pars, Phylodata) {
       ## FIXME: try u <- RTMB::expAv(Q * t, as.vector(childlik))??
       u <- drop(P %*% childlik)
       ## need as.matrix() to make drop() work properly 
-      v <- drop(as.matrix(v * u))
+      v <- Matrix::drop(v * u)
     }
     comp[i] <- sum(v)
     liks[i, ] <- v / comp[i]
@@ -211,9 +211,6 @@ prune_nll <- function(pars, Phylodata) {
   neg_loglik <- -1*(sum(log(comp[-TIPS])) + log(sum(root.p * liks[root, ])))
   return(neg_loglik)
 }
-
-
-
 
 make_prune_problem <- function(tree, trait_values,
                                mode = c("rates", "formula"),
@@ -287,16 +284,19 @@ make_prune_objective <- function(tree, trait_values,
   )
 }
 
-Qtemp <- Q_template(n = 2, k = 3)
+if (FALSE) {
+    ## testing
+    Qtemp <- Q_template(n = 2, k = 3)
 
-fit1 <- make_prune_objective(
-  tree = g1,
-  trait_values = s,
-  mode = "rates",
-  Q_template = Qtemp,
-  silent = TRUE
-)
+    fit1 <- make_prune_objective(
+        tree = g1,
+        trait_values = s,
+        mode = "rates",
+        Q_template = Qtemp,
+        silent = TRUE
+    )
 
-fit1$obj$fn()
-fit1$obj$gr()
-opt1 <- with(fit1$obj, nlminb(par, fn, gr))
+    fit1$obj$fn()
+    fit1$obj$gr()
+    opt1 <- with(fit1$obj, nlminb(par, fn, gr))
+}

@@ -82,8 +82,10 @@ translate <- function(formula_list, nstate = 2) {
   rownames(Q_indicator) <- colnames(Q_indicator) <- traitMatrix$label
 
   Q0_sparse <- Matrix::Matrix(0, ns, ns, sparse = TRUE, dimnames = list(traitMatrix$label, traitMatrix$label))
-  #Q0 <- matrix(0, ns, ns, dimnames = list(traitMatrix$label, traitMatrix$label))
-  #Q0 <- RTMB::AD(Q0)  ## convert base-R to RTMB/AD type
+
+  ## TODO: uncomment this and see what breaks (what's the error?)
+  ## Q0 <- matrix(0, ns, ns, dimnames = list(traitMatrix$label, traitMatrix$label))
+  ## Q0 <- RTMB::AD(Q0)  ## convert base-R to RTMB/AD type
 
   list(trait_names = trait_names, stateList = stateList, formulas = formula_list, traitMatrix = traitMatrix,
     edge_table = edge_tab, blocks = blocks, Q_indicator = Q_indicator, Q0 = Q0_sparse,
@@ -143,9 +145,8 @@ Q_template <- function(n=2, k= 3, set_indices = TRUE) {
 }
 
 build_Q <- function(q_par, q_prep) {
+  Q <- RTMB::AD(q_prep$Q0)
   if (q_prep$mode == "formula") {
-    Q <- RTMB::AD(q_prep$Q0)
-
     for (nm in names(q_prep$blocks)) {
       b <- q_prep$blocks[[nm]]
 
@@ -160,7 +161,6 @@ build_Q <- function(q_par, q_prep) {
     idx <- which(q_prep$Q_indicator != 0)
     map <- as.integer(q_prep$Q_indicator[idx])
     rates <- exp(q_par)
-    Q <- RTMB::AD(q_prep$Q0)
     Q[idx] <- rates[map]
   } 
   diag(Q) <- -rowSums(Q)
@@ -204,8 +204,8 @@ prune_nll <- function(pars, Phylodata) {
       childlik <- matrix(liks[desNodes[j], ], ncol = 1)
 
       P <- Matrix::expm(Q * t)
-      u <- drop(P %*% childlik)
-      v <- drop(as.matrix(v * u))
+      u <- drop(P %*% childlik) ## FIXME: do we really need this? (remove drop() and see if anything breaks)
+      v <- Matrix::drop(v * u)
     }
     comp[i] <- sum(v)
     liks[i, ] <- v / comp[i]

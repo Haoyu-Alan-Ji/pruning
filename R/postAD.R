@@ -9,6 +9,19 @@ library(parallel)
 
 source(here::here('R', 'general.R'))
 
+#' translate trait matrix (no species name!) to single trait
+#' @param traits trait matrix (trait values, 0-indexed)
+#' @param n number of states per trait
+multi_to_single <- function(traits, n = NULL) {
+    if (is.null(n)) {
+        n <- apply(traits, 2, max)+1
+        warning("guessing number of traits per state from max()+1")
+    }
+    x <- rev(cumprod(rev(n)))
+    x <- c(x[-1], 1) 
+    rowSums(sweep(traits, MARGIN = 2, x, "*")) + 1
+}
+
 gl_pairs <- function(q_prep) {
   if (q_prep$mode == "rates") {
     Qind <- q_prep$Q_indicator
@@ -137,19 +150,26 @@ random_refit <- function(task, Phylodata, pars0, opt.args = NULL) {
   df
 }
 
+#' will simulate random trait data if `traitMatrix` is missing
+#' @param verbose print output?
 #' @examples
 #' set.seed(427)
 #' g1 <- reorder(ape::rtree(20), "pruningwise")
 #' log_trans_rates <- log(abs(rnorm(8)))
-#' res <- postAD(g1, 2, 2, log_trans_rates, multistart = 10, seed = 427)
-#' @examples
+#' res <- postAD(tree = g1, trait = 2, state = 2, pars = log_trans_rates, multistart = 10, seed = 427)
 #' objfun <- postAD(g1, 2, 2, log_trans_rates, multistart = 10, seed = 427, return_obj = TRUE)
 #' objfun$fn(objfun$par)
-postAD <- function(mode = c('rates', 'formula'), tree, trait, state, pars, formula_list, traitMatrix = NULL,
+## FIXME: trait, state should probably be 'ntrait', 'nstate'
+postAD <- function(tree, trait, state, pars, formula_list = NULL, traitMatrix = NULL,
                   multistart = 10, parallel = TRUE, jitter.sd = 0.5,
                   seed = 427, rng_misuse = c("warning","error","ignore"),
-                  opt.args = NULL, keep_all = FALSE, return_obj = FALSE) {
+                  opt.args = NULL, keep_all = FALSE,
+                  return_obj = FALSE,
+                  return_obj_type = c("AD", "raw"),
+                  verbose = FALSE) {
 
+  return_obj_type <- match.arg(return_obj_type)
+  mode <- if (is.null(formula_list)) 'rates' else  'formula'
   rng_misuse <- match.arg(rng_misuse)
   t_total0 <- proc.time()[["elapsed"]]
   set.seed(seed)
@@ -175,11 +195,6 @@ postAD <- function(mode = c('rates', 'formula'), tree, trait, state, pars, formu
     }
     s <- as.numeric(unlist(s))
   } else {
-    multi_to_single <- function(traits, n = NULL) {
-      x <- rev(cumprod(rev(n)))
-      x <- c(x[-1], 1) 
-      rowSums(sweep(traits, MARGIN = 2, x, "*")) + 1
-    }
     nvec <- if (length(state) == 1) rep(state, trait) else state
     s <- multi_to_single(traitMatrix, nvec)
   }
@@ -187,9 +202,13 @@ postAD <- function(mode = c('rates', 'formula'), tree, trait, state, pars, formu
   gainloss_pairs <- gl_pairs(q_prep) 
   Phylodata <- list(q_prep = q_prep, tree = tree, trait_values = s, gainloss_pairs = gainloss_pairs)
 
+
+    
+  if (return_obj  && return_obj_type == "raw") return(list(fn = postfun, pars = list(q_par = pars), data = Phylodata))
+    
   # baseline
   t5 <- proc.time()[["elapsed"]]
-  ff0 <- RTMB::MakeADFun(func = cmb(postfun, Phylodata), 
+  ff0 <- RTMB::MakeADFun(func = cmb(postfun, Phylodata),
                           parameters = list(q_par = pars),
                           silent = TRUE
                         )
@@ -252,18 +271,39 @@ postAD <- function(mode = c('rates', 'formula'), tree, trait, state, pars, formu
               time_total = time_total
               )
   if (keep_all) out$result_frame <- result_frame
-  cat('loglik:\n'); print(obj.best)
-  cat('pars:\n'); print(pars.best)
-  cat('time:\n'); print(time_total)
-  cat('loglik cdf:\n'); plot(fn.cdf)
+  if (verbose) {
+     cat('loglik:\n'); print(obj.best)
+     cat('pars:\n'); print(pars.best)
+     cat('time:\n'); print(time_total)
+     cat('loglik cdf:\n'); plot(fn.cdf)
+  }
   out
 }
 
 
-# tree1 <- reorder(ape::rtree(40), "pruningwise")
+## testing
+if (FALSE) {
+    set.seed(101)
+    tree1 <- reorder(ape::rtree(40), "pruningwise")
 
-# qprep1 <- Q_prep(mode = "rates", nstate = 2, ntrait = 3)
-# pars1 <- setNames(rep(log(0.2), qprep1$n_par), qprep1$par_names)
+    qprep1 <- Q_prep(mode = "rates", nstate = 2, ntrait = 3)
+    pars1 <- setNames(rep(log(0.2), qprep1$n_par), qprep1$par_names)
 
-# res <- postAD(mode = "rates", tree1, 2, 2, pars1, multistart = 10, seed = 427)
+    res <- postAD(tree1, 2, 2, pars1, multistart = 10, seed = 427)
 
+    library(corHMM)
+    data(primates)
+    source("R/postAD.R")
+    prim_phy <- reorder(multi2di(primates[[1]]), "pruningwise")
+    ## now reorder to match tip labels and drop names column
+    prim_data <- primates[[2]][match(primates[[2]][,1], prim_phy$tip), -1]
+    pp <- postAD(prim_phy, trait = 2, state = 2, pars = rep(-2, 6),
+           formula_list = list(T1~1, T2 ~ T1),
+           return_obj = TRUE,
+           return_obj_type = "raw")
+
+    ## debug(pp$fn)
+
+    with(pp, fn(pars, data))
+         
+}
