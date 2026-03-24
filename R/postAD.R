@@ -13,13 +13,13 @@ source(here::here('R', 'general.R'))
 #' @param traits trait matrix (trait values, 0-indexed)
 #' @param n number of states per trait
 multi_to_single <- function(traits, n = NULL) {
-    if (is.null(n)) {
-        n <- apply(traits, 2, max)+1
-        warning("guessing number of traits per state from max()+1")
-    }
-    x <- rev(cumprod(rev(n)))
-    x <- c(x[-1], 1) 
-    rowSums(sweep(traits, MARGIN = 2, x, "*")) + 1
+  if (is.null(n)) {
+      n <- apply(traits, 2, max)+1
+      warning("guessing number of traits per state from max()+1")
+  }
+  x <- rev(cumprod(rev(n)))
+  x <- c(x[-1], 1) 
+  rowSums(sweep(traits, MARGIN = 2, x, "*")) + 1
 }
 
 gl_pairs <- function(q_prep) {
@@ -177,11 +177,7 @@ postAD <- function(tree, trait, state, pars, formula_list = NULL, traitMatrix = 
   tasks <- lapply(seq_len(multistart - 1), function(i) {
     si <- seed + i
     set.seed(si)
-    list(
-      id   = i,
-      seed = si,
-      start = as.numeric(pars) + rnorm(length(pars), 0, jitter.sd)
-    )
+    list(id   = i, seed = si, start = as.numeric(pars) + rnorm(length(pars), 0, jitter.sd))
   })
 
   q_prep <- Q_prep(mode = mode, formula_list = formula_list, nstate = state, ntrait = trait)
@@ -196,15 +192,33 @@ postAD <- function(tree, trait, state, pars, formula_list = NULL, traitMatrix = 
     s <- as.numeric(unlist(s))
   } else {
     nvec <- if (length(state) == 1) rep(state, trait) else state
+    spnames <- NULL
+
+    if (is.data.frame(traitMatrix) && ncol(traitMatrix) > 0) {
+        first_col <- traitMatrix[[1]]
+
+        if (is.character(first_col) || is.factor(first_col)) {
+            spnames <- as.character(first_col)
+            traitMatrix <- traitMatrix[, -1, drop = FALSE]
+        }
+    }
+
+    traitMatrix <- as.data.frame(traitMatrix)
+    traitMatrix[] <- lapply(traitMatrix, as.numeric)
+
     s <- multi_to_single(traitMatrix, nvec)
+
+    if (!is.null(spnames)) {
+      stopifnot(length(spnames) == ape::Ntip(tree))
+      stopifnot(all(spnames == tree$tip.label))
+      names(s) <- spnames
+    }
   }
 
   gainloss_pairs <- gl_pairs(q_prep) 
   Phylodata <- list(q_prep = q_prep, tree = tree, trait_values = s, gainloss_pairs = gainloss_pairs)
 
-
-    
-  if (return_obj  && return_obj_type == "raw") return(list(fn = postfun, pars = list(q_par = pars), data = Phylodata))
+  if (return_obj  && return_obj_type == "raw") return(list(fn = postfun, pars = list(q_par = pars), nll = function(par = pars) prune_nll(list(q_par = par), Phylodata), data = Phylodata))
     
   # baseline
   t5 <- proc.time()[["elapsed"]]
@@ -280,7 +294,16 @@ postAD <- function(tree, trait, state, pars, formula_list = NULL, traitMatrix = 
   out
 }
 
-
+if (FALSE) {
+  set.seed(101)
+  library(corHMM)
+  data(primates)
+  prim_phy <- reorder(multi2di(primates[[1]]), "pruningwise")
+  ## now reorder to match tip labels and drop names column
+  prim_data <- primates[[2]][match(primates[[2]][,1], prim_phy$tip), -1]
+  pp <- postAD(prim_phy, trait = 2, state = 2, pars = rep(-2, 6),
+          formula_list = list(T1~1, T2 ~ T1))
+}                       
 ## testing
 if (FALSE) {
     set.seed(101)

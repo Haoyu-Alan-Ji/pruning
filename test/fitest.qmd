@@ -59,8 +59,12 @@ c_traits <- data.frame(
 
 c_traits <- c_traits[!is.na(c_traits$care) & !is.na(c_traits$spawning), ]
 c_tree <- drop.tip(fish_tree, setdiff(fish_tree$tip.label, c_traits$Species))
+c_tree <- reorder(c_tree, "pruningwise")
 
 c_traits <- c_traits[match(c_tree$tip.label, c_traits$Species), ]
+
+pp <- postAD(c_tree, traitMatrix = c_traits, trait = 3, state = 2, pars = rep(-2, 12),
+            formula_list = list(ag~care*spawning, care ~ 1, spawning~1))
 ```
 
 ```{r}
