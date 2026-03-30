@@ -1,14 +1,14 @@
 ##' @examples
-#' realfun(raw_traitM = c_traits, raw_tree = c_tree)
+##' realfun(raw_traitM = c_traits, raw_tree = c_tree)
 realfun <- function(nstate = 2, raw_traitM, raw_tree) {
-  trait_number <- ncol(raw_traitM) - 1L
+  ntrait <- ncol(raw_traitM) - 1L
   ss <- function() {
     sample(0:(nstate - 1L), size = Ntip(raw_tree), replace = TRUE)
   }
   repeat {
-    d <- as.data.frame(replicate(trait_number, ss(), simplify = FALSE))
-    names(d) <- paste0("trait", seq_len(trait_number))
-    if (nrow(unique(d)) == nstate^trait_number) break
+    d <- as.data.frame(replicate(ntrait, ss(), simplify = FALSE))
+    names(d) <- paste0("trait", seq_len(ntrait))
+    if (nrow(unique(d)) == nstate^ntrait) break
   }
   d <- cbind(Species = raw_tree$tip.label, d)
   rownames(d) <- NULL
@@ -16,8 +16,8 @@ realfun <- function(nstate = 2, raw_traitM, raw_tree) {
 }
 
 ##' @examples
-#' o1 <- sample_subtree(c_tree, c_traits, 50)
-#' corHMM(phy = o1$tree, data = o1$traits, rate.cat = 1, use_RTMB = TRUE)
+##' o1 <- sample_subtree(c_tree, c_traits, 50)
+##' corHMM(phy = o1$tree, data = o1$traits, rate.cat = 1, use_RTMB = TRUE)
 sample_subtree <- function(tree, traits, ntaxa) {
   require(ape)
   

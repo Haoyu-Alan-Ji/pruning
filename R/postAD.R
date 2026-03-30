@@ -7,8 +7,6 @@ library(future)
 library(future.apply)
 library(parallel)
 
-source(here::here('R', 'general.R'))
-
 #' translate trait matrix (no species name!) to single trait
 #' @param traits trait matrix (trait values, 0-indexed)
 #' @param n number of states per trait
@@ -160,38 +158,41 @@ random_refit <- function(task, Phylodata, pars0, opt.args = NULL) {
 #' objfun <- postAD(g1, 2, 2, log_trans_rates, multistart = 10, seed = 427, return_obj = TRUE)
 #' objfun$fn(objfun$par)
 ## FIXME: trait, state should probably be 'ntrait', 'nstate'
-postAD <- function(tree, trait, state, pars, formula_list = NULL, traitMatrix = NULL,
-                  multistart = 10, parallel = TRUE, jitter.sd = 0.5,
-                  seed = 427, rng_misuse = c("warning","error","ignore"),
-                  opt.args = NULL, keep_all = FALSE,
-                  return_obj = FALSE,
-                  return_obj_type = c("AD", "raw"),
-                  verbose = FALSE) {
+postAD <- function(tree, state = 2, pars = NULL, traitMatrix = NULL, formula_list = NULL,
+                    multistart = 1, parallel = FALSE, jitter.sd = 0.5, seed = 427, 
+                    rng_misuse = c("warning","error","ignore"), opt.args = NULL, keep_all = FALSE,
+                    return_obj = FALSE, return_obj_type = c("AD", "raw"), verbose = FALSE
+                  ) {
 
   return_obj_type <- match.arg(return_obj_type)
   mode <- if (is.null(formula_list)) 'rates' else  'formula'
   rng_misuse <- match.arg(rng_misuse)
   t_total0 <- proc.time()[["elapsed"]]
+  
+  n_non_numeric <- sum(!vapply(traitMatrix, is.numeric, logical(1)))
+  if (n_non_numeric != 1L) stop("traitMatrix must look like: one non-numeric column for Species, and all remaining columns must be numeric trait columns.")
+  ntrait <- ncol(traitMatrix) - 1L
+  q_prep <- Q_prep(mode = mode, formula_list = formula_list, nstate = state, ntrait = ntrait)
   set.seed(seed)
-
+  if (is.null(pars)) pars <- setNames(log(abs(rnorm(q_prep$n_par))), q_prep$par_names)
+  
+  set.seed(seed)
   tasks <- lapply(seq_len(multistart - 1), function(i) {
     si <- seed + i
     set.seed(si)
-    list(id   = i, seed = si, start = as.numeric(pars) + rnorm(length(pars), 0, jitter.sd))
+    list(id = i, seed = si, start = as.numeric(pars) + rnorm(length(pars), 0, jitter.sd))
   })
-
-  q_prep <- Q_prep(mode = mode, formula_list = formula_list, nstate = state, ntrait = trait)
-
+  
   if (is.null(traitMatrix)) {
     repeat {
       set.seed(seed)
       s <- phangorn::simSeq(tree, l = 1, Q = q_prep$Q_indicator,
-                            type = "USER", levels = seq(state^trait), rate = 1)
-      if (nrow(unique(as.character(s))) == prod(state^trait)) break
+                            type = "USER", levels = seq(state^ntrait), rate = 1)
+      if (nrow(unique(as.character(s))) == prod(state^ntrait)) break
     }
     s <- as.numeric(unlist(s))
   } else {
-    nvec <- if (length(state) == 1) rep(state, trait) else state
+    nvec <- if (length(state) == 1) rep(state, ntrait) else state
     spnames <- NULL
 
     if (is.data.frame(traitMatrix) && ncol(traitMatrix) > 0) {
@@ -202,19 +203,16 @@ postAD <- function(tree, trait, state, pars, formula_list = NULL, traitMatrix = 
             traitMatrix <- traitMatrix[, -1, drop = FALSE]
         }
     }
-
     traitMatrix <- as.data.frame(traitMatrix)
     traitMatrix[] <- lapply(traitMatrix, as.numeric)
 
     s <- multi_to_single(traitMatrix, nvec)
-
     if (!is.null(spnames)) {
       stopifnot(length(spnames) == ape::Ntip(tree))
       stopifnot(all(spnames == tree$tip.label))
       names(s) <- spnames
     }
   }
-
   gainloss_pairs <- gl_pairs(q_prep) 
   Phylodata <- list(q_prep = q_prep, tree = tree, trait_values = s, gainloss_pairs = gainloss_pairs)
 

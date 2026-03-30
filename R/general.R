@@ -96,32 +96,6 @@ translate <- function(formula_list, nstate = 2) {
 #https://cran.r-project.org/web/packages/RTMB/vignettes/RTMB-introduction.html
 cmb <- function(f, d) function(p) f(p, d)
 
-Q_prep <- function(mode = c("rates", "formula"),
-                   formula_list = NULL,
-                   nstate = 2,
-                   ntrait = 3) {
-  mode <- match.arg(mode)
-
-  if (mode == "formula") {
-    trans <- translate(formula_list = formula_list, nstate = nstate)
-
-    return(list(mode = "formula", d = nrow(trans$traitMatrix),
-                Q0 = trans$Q0, Q_indicator = trans$Q_indicator,
-                n_par = trans$n_par, par_names = trans$par_names,
-                blocks = trans$blocks, trans = trans
-              ))
-  }
-
-  ## rates mode: build Q_indicator internally
-  Q_indicator <- Q_template(n = nstate, k = ntrait, set_indices = TRUE)
-  ns <- nrow(Q_indicator)
-  Q0_sparse <- Matrix(0, ns, ns, sparse = TRUE, dimnames = dimnames(Q_indicator))
-  list(mode = "rates", d = nrow(Q_indicator),
-      Q_indicator = Q_indicator, Q0 = Q0_sparse,
-      n_par = max(Q_indicator), par_names = paste0("log_rate_", seq_len(max(Q_indicator)))
-  )
-}
-
 Q_template <- function(n=2, k= 3, set_indices = TRUE) {
   if (length(n) == 1) {
     n <- rep(n, k)
@@ -142,6 +116,27 @@ Q_template <- function(n=2, k= 3, set_indices = TRUE) {
     m[m!=0] <- seq_len(sum(m==1))
   }
   return(m)
+}
+
+Q_prep <- function(mode = c("rates", "formula"), formula_list = NULL, nstate = 2, ntrait = 3) {
+  mode <- match.arg(mode)
+  if (mode == "formula") {
+    trans <- translate(formula_list = formula_list, nstate = nstate)
+
+    return(list(mode = "formula", d = nrow(trans$traitMatrix),
+                Q0 = trans$Q0, Q_indicator = trans$Q_indicator,
+                n_par = trans$n_par, par_names = trans$par_names,
+                blocks = trans$blocks, trans = trans
+              ))
+  }
+  ## rates mode: build Q_indicator internally
+  Q_indicator <- Q_template(n = nstate, k = ntrait, set_indices = TRUE)
+  ns <- nrow(Q_indicator)
+  Q0_sparse <- Matrix(0, ns, ns, sparse = TRUE, dimnames = dimnames(Q_indicator))
+  list(mode = "rates", d = nrow(Q_indicator),
+      Q_indicator = Q_indicator, Q0 = Q0_sparse,
+      n_par = max(Q_indicator), par_names = paste0("log_rate_", seq_len(max(Q_indicator)))
+  )
 }
 
 build_Q <- function(q_par, q_prep) {

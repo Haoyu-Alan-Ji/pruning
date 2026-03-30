@@ -1,0 +1,329 @@
+---
+title: "postAD: RTMB-based fitting for discrete-trait phylogenetic models"
+author: "Haoyu Ji"
+format:
+  html:
+    toc: true
+    toc-depth: 3
+    df-print: paged
+    self-contained: true
+    number-sections: true
+    code-tools: true
+    code-fold: false
+    code-summary: "Code"
+  pdf:
+    number-sections: true
+    fig-cap: true
+execute:
+  echo: true
+  warning: false
+  message: false
+  freeze: auto
+vignette: |
+  %\VignetteIndexEntry{postAD: RTMB-based fitting for discrete-trait phylogenetic models}
+  %\VignetteEngine{quarto::html}
+---
+
+```{r setup}
+if (!requireNamespace("here", quietly = TRUE)) install.packages("here")
+knitr::opts_chunk$set(collapse = TRUE, comment = "#>", fig.width = 7, fig.height = 5)
+
+library(Matrix)
+library(ape)
+library(tidyverse); theme_set(theme_bw())
+library(expm)
+library(RTMB)
+library(colorspace)
+
+source(here::here("R", "postAD.R"))
+source(here::here("R", "general.R"))
+```
+
+# abstract
+
+Background information
+
+Section 1: Default use of postAD
+
+- 1.1 A minimal example
+- 1.2 Understanding the return value
+- 1.3 Interpreting fit quality
+
+Section 2: The formula interface
+
+- 2.1 Why a formula interface?
+- 2.2 A complete formula example
+- 2.3 How formulas map to the underlying model
+- 2.4 Comparing the rates and formula interfaces
+
+Section 3: Optimization, diagnostics, and reproducibility
+
+- 3.1 Starting values
+- 3.2 Multistart fitting
+- 3.3 Parallel execution
+- 3.4 Reproducibility
+
+Section 4: Advanced workflows
+
+- 4.1 Returning low-level objects
+- 4.2 Custom optimization workflows
+- 4.3 Common failure modes
+
+
+# Background information
+
+`postAD` fits continuous-time Markov models for discrete trait evolution on a phylogeny using an RTMB backend. The package is designed around two complementary interfaces:
+
+- a rates interface, where transition-rate parameters are specified directly; and
+- a formula interface, where structured hypotheses about transition rates are expressed through formulas.
+
+Both interfaces target the same underlying pruning likelihood. They differ only in how the transition model is parameterized.
+
+## From multiple traits to a single state space
+
+Suppose we have a single binary trait with states 0 and 1. The corresponding transition-rate matrix is
+$$
+Q=\left[\begin{matrix}
+- & q_{1 \to 0}\\
+q_{0 \to 1} & -
+\end{matrix}\right]
+$$
+.
+
+This matrix is read from row to column: the entry in row $i$, column $j$ gives the instantaneous transition rate from state $i$ to state $j$.
+
+If we instead model two binary traits jointly, the observed state space becomes
+$$
+{00,01,10,11},
+$$
+
+so that the model is defined on a larger state space. In most applications, we disallow simultaneous changes in more than one trait, so only single-step transitions are permitted.
+
+The main idea behind `postAD` is the same: multiple observed traits are converted into a joint state space, and a continuous-time Markov model is fitted on that state space.
+
+## Two interfaces, one likelihood
+
+The ** rates interface** is most useful when the user wants direct control over the free parameters in the transition model.
+
+The *formula interface* is most useful when the user wants to express structured hypotheses compactly. For example, a user may want the transition process for one trait to depend on the states of other traits through additive or interaction terms.
+
+In both cases, the fitted object is obtained by optimizing the same pruning-based objective.
+
+## Data conventions
+
+Throughout this vignette, we assume that:
+
+`tree` is an object of class `phylo`,
+`traitMatrix` is a data frame,
+the first column of `traitMatrix` contains species names, and
+all remaining columns are numeric trait columns.
+
+The species names in `traitMatrix` must match `tree$tip.label` exactly and in the same order, unless the relevant preprocessing step reorders them explicitly.
+
+# Section 1: Default use of postAD
+
+## A minimal example
+
+We begin with a small example using a tree and a trait matrix with three binary traits.
+
+```{r}
+c_tree <- readRDS(here::here("data", "c_tree.rds"))
+c_traits <- readRDS(here::here("data", "c_traits.rds"))
+
+head(c_traits)
+```
+
+A basic postAD fit only requires a tree, a trait matrix, and the number of states per trait:
+
+```{r}
+fit0 <- postAD(tree = c_tree, traitMatrix = c_traits, state = 2)
+```
+
+Printing the object should display a compact summary of the fitted model:
+
+```{r}
+fit0
+```
+
+At minimum, the fit is expected to contain:
+
+- the best parameter vector,
+- the optimized objective value,
+- the gradient at the optimum
+- timing information.
+
+## Understanding the return value
+
+A typical fitted object contains the following key components:
+
+- `pars.best`: the best-fitting parameter vector on the optimization scale;
+- `obj.best`: the optimized objective value;
+- `gr.best`: the gradient evaluated at pars.best;
+- `time_total`: total elapsed time for the fitting routine.
+
+For example:
+
+```{r}
+str(fit0, max.level = 1)
+```
+
+If the model was fitted with `keep_all = TRUE`, the returned object may also include a `result_frame` storing the results of all optimization attempts.
+
+```{r}
+fit0_ms <- postAD(
+  tree = c_tree,
+  traitMatrix = c_traits,
+  state = 2,
+  multistart = 5,
+  keep_all = TRUE
+)
+
+names(fit0_ms)
+head(fit0_ms$result_frame)
+```
+
+## Interpreting fit quality
+
+A useful first diagnostic is the gradient norm,
+$$
+\|\nabla f(\hat{\theta})\|^2 = \sqrt{\sum_{i} \left( \frac{\partial f}{\partial \theta_i} \right)^2} 
+$$
+In code:
+
+```{r}
+sqrt(sum(fit0$gr.best^2))
+```
+
+Smaller values indicate that the optimizer has reached a point closer to a stationary point of the objective. In practice, the gradient norm should always be interpreted together with:
+
+- the optimizer convergence code,
+- the objective value,
+- the stability of the solution across restarts, and
+- the biological plausibility of the fitted rates.
+
+# The formula interface
+
+## Why a formula interface?
+
+Direct rate parameterization can become cumbersome when the state space is large or when the user wants to express structured hypotheses. For example, it may be natural to say:
+
+- the transition process for `care` is constant;
+- the transition process for `spawning` is constant
+- the transition process for `ag` depends on `care`, `spawning`, and their interaction.
+
+The formula interface provides a compact way to express such models.
+
+##  A complete formula example
+
+Suppose our trait matrix contains the binary traits `ag`, `care`, and `spawning`. A simple formula-based model can be written as:
+
+```{r}
+fit_formula <- postAD(tree = c_tree, traitMatrix = c_traits, state = 2, formula_list = list(ag ~ care * spawning, care ~ 1, spawning ~ 1))
+```
+
+This says:
+
+- the transition process for `ag` depends on `care`, `spawning`, and their interaction;
+- the transition process for `care` has only an intercept term;
+- the transition process for `spawning` has only an intercept term.
+
+## How formulas map to the underlying model
+
+Internally, the formula interface is translated into a parameterized transition model. The exact mapping depends on the package internals, but conceptually the workflow is:
+
+- construct the joint state space;
+- determine which transitions are allowed;
+- build design matrices implied by the formulas;
+- map the resulting coefficients to the transition-rate model.
+
+If the package exposes a preprocessing helper such as `Q_prep()`, it can be helpful to inspect it directly:
+
+```{r}
+qp <- Q_prep(
+  mode = "formula",
+  formula_list = list(
+    ag ~ care * spawning,
+    care ~ 1,
+    spawning ~ 1
+  ),
+  nstate = 2,
+  ntrait = 3
+)
+
+qp$par_names
+```
+
+This is often the easiest way to understand exactly which coefficients are being estimated.
+
+## Comparing the rates and formula interfaces
+
+Because both interfaces target the same likelihood, it is natural to compare them on the same dataset.
+
+```{r}
+fit_rates <- postAD(
+  tree = c_tree,
+  traitMatrix = c_traits,
+  state = 2
+)
+
+fit_formula <- postAD(
+  tree = c_tree,
+  traitMatrix = c_traits,
+  state = 2,
+  formula_list = list(
+    ag ~ care * spawning,
+    care ~ 1,
+    spawning ~ 1
+  )
+)
+
+data.frame(
+  method = c("rates", "formula"),
+  objective = c(fit_rates$obj.best, fit_formula$obj.best),
+  grad_norm = c(
+    sqrt(sum(fit_rates$gr.best^2)),
+    sqrt(sum(fit_formula$gr.best^2))
+  ),
+  total_time = c(fit_rates$time_total, fit_formula$time_total)
+)
+```
+
+When comparing the two interfaces, it is important to distinguish between:
+
+- equality of the optimized objective value,
+- similarity of the fitted parameter vectors, and
+- similarity of the implied transition model.
+
+Depending on the parameterization, raw parameter vectors may not always be directly comparable term by term even when the implied fitted model is similar.
+
+# Optimization, diagnostics, and reproducibility
+
+## Starting values
+
+If `pars = NULL`, `postAD` generates an initial parameter vector automatically
+
+```{r}
+fit_auto <- postAD(
+  tree = c_tree,
+  traitMatrix = c_traits,
+  state = 2
+)
+```
+Users may also supply their own starting values explicitly:
+
+```{r}
+pars0 <- rep(log(0.1), 24)
+
+fit_user <- postAD(
+  tree = c_tree,
+  traitMatrix = c_traits,
+  state = 2,
+  pars = pars0
+)
+```
+
+Custom starting values are particularly useful for difficult models or when comparing alternative optimization strategies.
+
+## Multistart fitting
+
+For complex objectives, a single optimization run may converge to a poor local optimum. `postAD` therefore supports multistart fitting:

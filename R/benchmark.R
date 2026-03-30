@@ -98,3 +98,36 @@ sumfun <- function(ntrait = 2, ntaxa = 200, model = "ARD", seed = NULL,
              orig_rmse = p_orig_rmse
   )
 }
+
+##' @examples
+##' dat <- list(tree = c_tree, data = c_traits)
+##' pp1 <- adfit(dat = dat, formula_list = list(ag~care*spawning, care~1, spawning~1), keep_all = TRUE)
+adfit <- function(dat, ...) {
+  tt <- system.time(invisible(capture.output(suppressWarnings(x <- with(dat, postAD(tree = tree, traitMatrix = data,...))))))
+  attr(x, "time") <- tt
+  x
+}
+
+##' @examples
+##' t2 <- adsum(seed = 101, traitMatrix = c_traits, realtree = c_tree, formula_list = list(ag~care*spawning, care~1, spawning~1))
+adsum <- function(ntaxa = 200, state = 2, seed, traitMatrix, realtree, formula_list, ...) {
+  if (!is.null(seed)) set.seed(seed)
+  seed <- seed %||% NA
+  ntrait <- ncol(traitMatrix) - 1L
+  ss <- realfun(raw_traitM = traitMatrix, raw_tree = realtree) 
+  
+  fit_rates <- adfit(ss, state = state, keep_all = TRUE, ...)
+  fit_formula <- adfit(ss, state = state, formula_list = formula_list, keep_all = TRUE, ...)
+
+  data.frame(
+    seed, ntrait, state = state, ntaxa,
+    rates_opt.time = fit_rates$result_frame$time_opt,
+    formula_opt.time = fit_formula$result_frame$time_opt,
+    rates_tot.time = attr(fit_rates, "time")[["elapsed"]],
+    formula_tot.time = attr(fit_formula, "time")[["elapsed"]],
+    rates_loglik = fit_rates$obj.best,
+    formula_loglik = fit_formula$obj.best,
+    rates_grad_norm = sqrt(sum(fit_rates$gr.best^2)),
+    formula_grad_norm = sqrt(sum(fit_formula$gr.best^2))
+  )
+}
