@@ -99,16 +99,51 @@ sumfun <- function(ntrait = 2, ntaxa = 200, model = "ARD", seed = NULL,
   )
 }
 
+## convenience function to get everything we need for examples
+## FIXME: make everything into an R package, this would all happen automatically ...
+get_all <- function() {
+    eval.parent({
+        sourcefiles <- c("postAD.R", "general.R", "realtree.R", "benchmark.R")
+        invisible(sapply(here::here(sprintf("R/%s", sourcefiles)), source))
+        assign("c_traits", readRDS(here::here("data/c_traits.rds")), parent.frame())
+        assign("c_tree", readRDS(here::here("data/c_tree.rds")), parent.frame())
+    })
+    invisible(NULL)
+}
+    
 ##' @examples
+##' get_all()
 ##' dat <- list(tree = c_tree, data = c_traits)
-##' pp1 <- adfit(dat = dat, formula_list = list(ag~care*spawning, care~1, spawning~1), keep_all = TRUE)
-adfit <- function(dat, ...) {
+##' system.time(pp0 <- adfit(dat = dat, keep_all = TRUE))
+##' flist <- list(ag~care*spawning, care~1, spawning~1)
+##' system.time(pp1 <- adfit(dat = dat, formula_list = flist, keep_all = TRUE))
+##' stopifnot(length(pp0$pars.best) == 24)
+##' stopifnot(length(pp1$pars.best) == 12)
+##' nll_diff <- pp0$obj.best - pp1$obj.best ## NLL difference, rates minus formula
+##' ## likelihood ratio test
+##' pchisq(-2*nll_diff, df = 12, lower.tail = FALSE)
+##' ## trying to diagnose why NLL for unconstrained (rates) is *worse* (larger)
+##' ##  than constrained (formula) when we use random data (doesn't make sense,
+##' ##  because constrained is nested in unconstrained, so NLL for unconstrained
+##' ##  should always be *lower* (better), although not much better, especially
+##' ##  for random trait data! Can this be a getting-stuck/multi-start problem??
+##' set.seed(101)
+##' rdat <- realfun(2, c_traits, c_tree)
+##' ppr0 <- adfit(dat = rdat, keep_all = TRUE, multistart = 10, parallel = TRUE)
+##' ppr1 <- adfit(dat = rdat, formula_list = flist, keep_all = TRUE, multistart = 10,
+##'     parallel = TRUE)
+##' ppr0$obj.best - ppr1$obj.best
+##' rf0 <- ppr0$result_frame
+##' rf1 <- rf0[ , grepl("^fitted", colnames(rf0)) ]
+##' pairs(rf1[,1:12], gap = 0)
+##' adfit <- function(dat, ...) {
   tt <- system.time(invisible(capture.output(suppressWarnings(x <- with(dat, postAD(tree = tree, traitMatrix = data,...))))))
   attr(x, "time") <- tt
   x
 }
 
 ##' @examples
+##' get_all()
 ##' t2 <- adsum(seed = 101, traitMatrix = c_traits, realtree = c_tree, formula_list = list(ag~care*spawning, care~1, spawning~1))
 adsum <- function(ntaxa = 200, state = 2, seed, traitMatrix, realtree, formula_list, ...) {
   if (!is.null(seed)) set.seed(seed)
