@@ -13,7 +13,7 @@ date: today
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 library(here)
-setwd(here::here())
+## setwd(here::here()) ## BMB: should be unnecessary as long as you use here() throughout
 ```
 
 ```{r pkgs, include=FALSE, message = FALSE, warning=FALSE}
@@ -36,7 +36,7 @@ set.seed(427)
 ## https://github.com/bbolker/corHMM/blob/bolker_clean/misc/test_RTMB.R
 ## remotes::install_github("bbolker/corHMM", ref = "bolker_clean")
 source(here::here("R", "pruning_funs.R"))
-source(here::here("R", "corHMM_sim.R"))
+source(here::here("R", "benchmark.R"))
 source(here::here("R", "realtree.R"))
 ```
 
@@ -70,7 +70,7 @@ c_tree <- drop.tip(fish_tree, setdiff(fish_tree$tip.label, c_traits$Species))
 c_traits <- c_traits[match(c_tree$tip.label, c_traits$Species), ]
 ```
 
-```{r getdat, eval = FALSE}
+```{r getdat}
 #| code-summary: "resampling and running"
 ntaxvec <- as.numeric(45:234)
 
@@ -80,7 +80,7 @@ dd <- expand.grid(seed = 101:104, ntaxa  = ntaxvec, ntrait = 3, model = "ARD", r
 res <- list()
 
 for (i in seq_len(nrow(dd))) {
-  cat(sprintf("\rRunning %d/%d", i, nrow(dd)))
+  cat(sprintf("\rRunning %d/%d", i, nrow(dd)), "\n")
   flush.console()
 
   ntaxa_i <- dd$ntaxa[i]

@@ -136,7 +136,7 @@ get_all <- function() {
 ##' rf0 <- ppr0$result_frame
 ##' rf1 <- rf0[ , grepl("^fitted", colnames(rf0)) ]
 ##' pairs(rf1[,1:12], gap = 0)
-##' adfit <- function(dat, ...) {
+adfit <- function(dat, ...) {
   tt <- system.time(invisible(capture.output(suppressWarnings(x <- with(dat, postAD(tree = tree, traitMatrix = data,...))))))
   attr(x, "time") <- tt
   x
