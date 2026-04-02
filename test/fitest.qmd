@@ -68,6 +68,23 @@ saveRDS(c_tree, file = here::here("data", "c_tree.rds"))
 saveRDS(c_traits, file = here::here("data", "c_traits.rds"))
 ```
 
+```{r tt}
+sub <- sample_subtree(tree = c_tree, traits = c_traits, ntaxa  = 100)
+r1 <- realfun_match(sub$traits, sub$tree) #realfun_match return matched c_traits value, no longer simulates them
+
+rates1 <- adfit(r1)
+formula1 <- adfit(r1, formula_list = list(ag~care*spawning, care~1, spawning~1))
+rates1$obj.best - formula1$obj.best
+
+rates2 <- postAD(tree = r1$tree, traitMatrix = r1$data)
+formula2 <- postAD(tree = r1$tree, traitMatrix = r1$data, formula_list = list(ag~care*spawning, care~1, spawning~1))
+rates2$obj.best - formula2$obj.best
+
+nll_rates <- prune_nll(list(q_par = rates2$pars.best), rates2$Phylo)
+nll_formula <- prune_nll(list(q_par = formula2$pars.best), formula2$Phylo)
+nll_rates - nll_formula
+```
+
 ```{r getdat, eval = FALSE}
 #| code-summary: "resampling and running"
 c_tree <- readRDS(here::here("data", "c_tree.rds"))

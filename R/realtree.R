@@ -37,3 +37,26 @@ sample_subtree <- function(tree, traits, ntaxa) {
   
   list(tree = sub_tree, traits = sub_traits)
 }
+
+realfun_match <- function(raw_traitM, sub_tree) {
+  sp <- raw_traitM[[1]]
+  sp <- as.character(sp)
+  
+  miss <- setdiff(sub_tree$tip.label, sp)
+  if (length(miss) > 0L) {
+    stop(
+      "The following subtree tip labels were not found in `raw_traitM`: ",
+      paste(miss, collapse = ", ")
+    )
+  }
+  
+  idx <- match(sub_tree$tip.label, sp)
+  sub_traits <- raw_traitM[idx, , drop = FALSE]
+  
+  names(sub_traits)[1] <- "Species"
+  rownames(sub_traits) <- NULL
+  
+  stopifnot(all(sub_tree$tip.label == as.character(sub_traits$Species)))
+  
+  list(tree = sub_tree, data = sub_traits)
+}
