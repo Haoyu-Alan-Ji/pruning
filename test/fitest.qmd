@@ -69,20 +69,43 @@ saveRDS(c_traits, file = here::here("data", "c_traits.rds"))
 ```
 
 ```{r tt}
-sub <- sample_subtree(tree = c_tree, traits = c_traits, ntaxa  = 100)
+sub <- sample_subtree(tree = c_tree, traits = c_traits, ntaxa = 233)
 r1 <- realfun_match(sub$traits, sub$tree) #realfun_match return matched c_traits value, no longer simulates them
-
-rates1 <- adfit(r1)
-formula1 <- adfit(r1, formula_list = list(ag~care*spawning, care~1, spawning~1))
-rates1$obj.best - formula1$obj.best
 
 rates2 <- postAD(tree = r1$tree, traitMatrix = r1$data)
 formula2 <- postAD(tree = r1$tree, traitMatrix = r1$data, formula_list = list(ag~care*spawning, care~1, spawning~1))
-rates2$obj.best - formula2$obj.best
+rates2$obj.best - formula2$obj.best # [1] 18.73561
 
 nll_rates <- prune_nll(list(q_par = rates2$pars.best), rates2$Phylo)
 nll_formula <- prune_nll(list(q_par = formula2$pars.best), formula2$Phylo)
-nll_rates - nll_formula
+nll_rates - nll_formula  # [1] -12.81892
+
+r12 <- list(tree = c_tree, data = c_traits)
+
+rates22 <- postAD(tree = r12$tree, traitMatrix = r12$data)
+formula22 <- postAD(tree = r12$tree, traitMatrix = r12$data, formula_list = list(ag~care*spawning, care~1, spawning~1))
+rates22$obj.best - formula22$obj.best  # [1] -7.137838
+
+nll_rates <- prune_nll(list(q_par = rates22$pars.best), rates22$Phylo)
+nll_formula <- prune_nll(list(q_par = formula22$pars.best), formula22$Phylo)
+nll_rates - nll_formula  # [1] -42.03263
+
+library(corHMM)
+data(primates)
+
+tr <- primates$trait
+tr$Genus_sp <- as.character(tr$Genus_sp)
+tr <- tr[match(primates$tree$tip.label, tr$Genus_sp), , drop = FALSE]
+names(tr)[1] <- "Species"
+rates3 <- postAD(tree = reorder(primates$tree, 'pruningwise'), traitMatrix = tr)
+formula3 <- postAD(tree = reorder(primates$tree, 'pruningwise'), traitMatrix = tr, formula_list = list(T1~T2, T2~1))
+rates3$obj.best - formula3$obj.best # [1] 4.799158
+
+sub1 <- sample_subtree(tree = reorder(primates$tree, 'pruningwise'), traits = tr, ntaxa = 40)
+r4 <- realfun_match(sub1$traits, sub1$tree) #realfun_match return matched c_traits value, no longer simulates them
+rates4 <- postAD(tree = r4$tree, traitMatrix = r4$data)
+formula4 <- postAD(tree = r4$tree, traitMatrix = r4$data, formula_list = list(T1~T2, T2~1))
+rates4$obj.best - formula4$obj.best # [1] 5.234301
 ```
 
 ```{r getdat, eval = FALSE}
