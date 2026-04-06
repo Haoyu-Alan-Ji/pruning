@@ -28,8 +28,8 @@ vignette: |
 ```{r setup}
 #| code-fold: true
 #| code-summary: "packages"
-if (!requireNamespace("here", quietly = TRUE)) install.packages("here")
-knitr::opts_chunk$set(collapse = TRUE, comment = "#>", fig.width = 7, fig.height = 5)
+knitr::opts_chunk$set(collapse = TRUE,
+                      comment = "#>", fig.width = 7, fig.height = 5)
 
 library(Matrix)
 library(ape)
@@ -41,6 +41,10 @@ library(colorspace)
 source(here::here("R", "postAD.R"))
 source(here::here("R", "general.R"))
 ```
+
+**FIXME**
+
+* change `state` to `nstates`; default can be `sapply(traitMatrix, max) - 1` ?
 
 # Background information
 
@@ -66,10 +70,10 @@ This matrix is read from row to column: the entry in row $i$, column $j$ gives t
 
 If we instead model two binary traits jointly, the observed state space becomes
 $$
-{00,01,10,11},
+\{00,01,10,11\},
 $$
 
-so that the model is defined on a larger state space. In most applications, we disallow simultaneous changes in more than one trait, so only single-step transitions are permitted.
+so that the model is defined on a larger state space. In most applications, we assume that evolution occurs. Thus we disallow simultaneous changes in more than one trait, so only single-step transitions are permitted.
 
 The main idea behind `postAD` is the same: multiple observed traits are converted into a joint state space, and a continuous-time Markov model is fitted on that state space.
 
@@ -90,9 +94,9 @@ Throughout this vignette, we assume that:
 - The first column of `traitMatrix` contains species names, and all remaining columns are numeric trait columns.
 - The species names in `traitMatrix` must match `tree$tip.label` exactly and in the same order, unless the relevant preprocessing step reorders them explicitly.
 
-State vectors are typically specified as `rep(2, n)`, but non-binary traits and combinations of traits with different numbers of states are also allowed, for example `rep(3, n)` or `c(2, 3, 4)`. When a single state value is supplied, it is interpreted as applying to all traits. If no state vector is provided, all traits are assumed to be binary by default.
+We typically assume a set of `n` state vectors (i.e. `state = rep(2, n)`, but non-binary traits and combinations of traits with different numbers of states are also allowed, for example `rep(3, n)` or `c(2, 3, 4)`. When a single state dimension supplied, it is interpreted as applying to all traits. If no state vector is provided, all traits are assumed to be binary.
 
-## Dateset description
+## Dataset description
 
 The datasets `c_tree` and `c_traits` form a matched phylogeny–trait dataset used throughout this vignette.
 
@@ -100,11 +104,11 @@ The datasets `c_tree` and `c_traits` form a matched phylogeny–trait dataset us
 
 `c_traits` is a 234 × 4 data frame containing one row per species. The column Species gives the species names, and the remaining columns represent three binary traits:
 
-- ag: accessory gland presence/absence
-- care: parental care
-- spawning: spawning mode
+- `ag`: accessory gland presence/absence
+- `care`: parental care
+- `spawning`: spawning mode
 
-The ordering of species in `c_traits` has been synchronized with `c_tree$tip.label`, so the two objects can be passed directly into the fitting functions without additional matching or reordering.
+The ordering of species in `c_traits` matches that of `c_tree$tip.label`, so the two objects can be passed directly into the fitting functions without additional matching or reordering.
 
 # Default use of postAD
 
@@ -118,7 +122,7 @@ c_traits <- readRDS(here::here("data", "c_traits.rds"))
 head(c_traits)
 ```
 
-A basic postAD fit only requires a tree, a trait matrix, and the number of states per trait:
+A basic `postAD` fit only requires a tree, a trait matrix, and the number of states per trait:
 
 ```{r fit0}
 fit0 <- postAD(tree = c_tree, traitMatrix = c_traits, state = 2)
@@ -157,7 +161,7 @@ If the model was fitted with `keep_all = TRUE`, the returned object may also inc
 ```{r fit0ms}
 fit0_ms <- postAD(tree = c_tree, traitMatrix = c_traits, state = 2, keep_all = TRUE)
 names(fit0_ms)
-head(fit0_ms$result_frame)
+dplyr::as_tibble(fit0_ms$result_frame)
 ```
 
 The optimizer's run-time is also stored in `result_frame`; to view it, call `result_frame$time_opt`.
