@@ -19,51 +19,51 @@ Taking the model from Eckert et al., where we have traits `ag` (accessory glands
 list(ag ~ pc*sc, pc ~ 1, sc ~ 1)
 ```
 
-to denote that rates of gain/loss in `pc`, `sc` are independent of the other traits, and `ag` gain/loss are different in every (`pc` × `sc`) state. More specifically we could call this
+to denote that rates of gain/loss in `pc`, `sc` are independent of the other traits, and `ag` gain/loss are different in every (`pc` × `sc`) state.
+
+The `ARD` (all rates different) specification in `corHMM` would be specified as
 
 ```{r ex2}
-list(ag ~ asymm(pc*sc), pc ~ asymm(1), sc ~ asymm(1))
-```
-to denote that the rates are asymmetric (different parameters for gain and loss). Other possibilities would be `symm()` (symmetric), `directed()` (transitions only allowed in the direction of an ordered set of states; possibly allow "down" or "up"?). In principle it should also be possible to specify different models in each direction, `~pc*sc` for gains and `~1` for losses; not quite sure how to specify this. Maybe `list(ag = ~symm(pc*sc), pc = list(~1, ~sc), ...)` ? Want a reasonable compromise between consistency and simple defaults. (Use `sym`, `ard` `eq` for consistency with current corHMM "SYM"?
-
-How should all of this extend to covarion models (i.e. specifying what changes between covarion blocks)?
-
-* parse formulas
-* set up as many model matrices as necessary (model matrices are small so duplication shouldn't be a problem), e.g. one for gain/loss (not sure what to do about traits with many levels?)
-* set up machinery for partitioning a parameter vector, multiplying model frames by the corresponding sub-vector, and inserting the results into the appropriate elements of the $Q$ matrix ...
-
-If we don't need to allow for arbitrary nesting then we probably don't need `reformulas` machinery for recursive processing. Slightly easier to deal  with if make this a *named list* (e.g. `x = ~ form`) rather than an list with unnamed components (`x ~ form`), but the latter seems more natural ?
-
-Assume that our input is a data frame `data` with trait values
-
-```{r test1}
-source("R/pruning_funs.R")
-library(Matrix)
-library(latticeExtra)
-ifun <- function(X) {
-  sc <- list(x = list(at = 1:ncol(X), labels = colnames(X)),
-             y = list(at = 1:nrow(X), labels = rownames(X)))
-  image(Matrix(X), scales = sc, xlab = "", ylab  = "",
-        title = "", sub = "")
-}
-## would like to overlay numeric labels but that's hard
-## values are labeled in columnwise order
-ifun(Q_template())
+list(ag ~ pc*sc, pc ~ ag*sc, sc ~ ag*pc)
 ```
 
-* which elements correspond to which transitions? 
-* correspondence between non-focal state values and elements ... e.g. in this example the gains in trait 1 (`ag`) are elements 1, 8, 14, 21 ...
-* construct all combinations of non-focal traits (`expand.grid`)
-* construct model matrix for these combinations (`model.matrix`)
-* multiply param vector by this model matrix
-* insert
+When we call `model.matrix()` to generate design matrices that map optimization parameters to rates of loss/gain according to these rules, the optimization parameters will automatically be expressed in terms of contrasts, e.g. for `ag ~ pc*sc` the parameters (for, e.g., gain of accessory glands: loss rates will be parallel) are
 
-e.g.
+* intercept: log-hazard of gain when pc=0, sc=0
+* pc effect: difference between log-hazard of gain between (pc=0,sc=0) and (pc=1,sc=0)
+* sc effect: ditto, (pc=0,sc=0) vs (pc=0,sc=1)
+* interaction: (pc1,sc1)-(pc1,sc0)-(pc0,sc1)+(pc0,sc0)
+
+We can see this in action:
 
 ```{r}
-all_traits <- expand.grid(ag = factor(0:1), sc = factor(0:1), pc = factor(0:1))
-form <- ag ~ sc+pc
-nonfocal_data <- unique(all_traits[,-1])
-X <- model.matrix(form[-2], data = nonfocal_data)
-drop(X %*% c(1:3))
+mkmat <- function(form, data, ...) {
+  X <- model.matrix(form, data = data, ...)
+  nm <- lapply(names(data), \(nm) sprintf("%s=%s", nm, data[[nm]])) |>
+    do.call(what = \(...) paste(..., sep = ","))
+  rownames(X) <- nm
+  X
+}
+pfun <- function(p) {
+  attr(p, "assign") <- attr(p, "contrasts") <- NULL
+  print(p)
+  invisible(NULL)
+}
+m <- expand.grid(sc=factor(0:1), pc=factor(0:1))
+pfun(X <- mkmat(~sc*pc, m))
+solve(X)
 ```
+
+Or
+
+```{r}
+pfun(X <- mkmat(~sc*pc, m, contrasts = list(sc = contr.sum, pc = contr.sum)))
+MASS::fractions(solve(X))
+```
+
+Haoyu has implemented this machinery (not within `corHMM` but within a separate repo [here](https://github.com/Haoyu-Alan-Ji/pruning)). It does handle this case, here are the things it *doesn't* handle yet:
+
+* **symmetry**: there should (?) be a way to specify that the gain/loss rates of a particular trait are symmetric, e.g. `ag ~ symm(pc*sc)`. This seems fussy but not terribly hard to implement.
+* **directed transitions**: do we need to be able to specify that some transitions are forbidden, e.g. loss-only or gain-only traits? (Seems of limited utility; more detailed hypotheses about forbidden transitions, e.g. "gain of A is only possible when B=1 and C=1" probably still need to be coded manually?)
+* **extensions to the covarion model**: it's not clear (a) whether our current machinery would work properly for covarion models with >1 blocks, or (b) whether one would want more fine-grained control of how traits varied within and among covarion blocks
+

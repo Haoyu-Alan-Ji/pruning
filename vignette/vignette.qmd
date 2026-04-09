@@ -25,12 +25,14 @@ vignette: |
   %\VignetteEncoding{UTF-8}
 ---
 
-```{r setup}
-#| code-fold: true
-#| code-summary: "packages"
+```{r setup, include = FALSE}
 knitr::opts_chunk$set(collapse = TRUE,
                       comment = "#>", fig.width = 7, fig.height = 5)
+```
 
+```{r pkgs}
+#| code-fold: true
+#| code-summary: "packages"
 library(Matrix)
 library(ape)
 library(tidyverse); theme_set(theme_bw())
@@ -48,7 +50,7 @@ source(here::here("R", "general.R"))
 
 # Background information
 
-`postAD` fits continuous-time Markov models for discrete trait evolution on a phylogeny using an RTMB backend. The package is designed around two complementary interfaces:
+`postAD` fits continuous-time Markov models for discrete trait evolution on a phylogeny using an RTMB backend. It is a test-bed for things we will eventually want to incorporate into the [corHMM package](https://github.com/thej022214/corHMM). The code is designed around two complementary interfaces:
 
 - **rates interface**: where transition-rate parameters are specified directly
 - **formula interface**: where structured hypotheses about transition rates are expressed through formulas.
@@ -191,8 +193,8 @@ Smaller values indicate that the optimizer has reached a point closer to a stati
 
 Direct rate parameterization can become cumbersome when the state space is large or when the user wants to express structured hypotheses. For example, it may be natural to say:
 
-- the transition process for `care` is constant;
-- the transition process for `spawning` is constant
+- the rates of the transition processes (gain and loss) for `care` are constant, independent of other traits;
+- the same for the rates of gain and loss of `spawning`;
 - the transition process for `ag` depends on `care`, `spawning`, and their interaction.
 
 The formula interface provides a compact way to express such models.
