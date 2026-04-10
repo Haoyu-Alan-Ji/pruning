@@ -1,19 +1,20 @@
 ---
-title: "a formula interface for corHMM $Q$ matrices"
+title: "a formula interface for `corHMM` transition matrices"
+bibliography: pruning.bib
 format:
   html:
     embed-resources: true
 ---
 
-For multi-trait models (where the state vector consists of combinations of categories of different traits) we'd like to be able to use Wilkinson-Rogers-like formulas to specify a mapping from model parameters to the elements of $Q$ matrices. This will have several benefits:
+For multi-trait models (where the state vector consists of combinations of categories of different traits) we'd like to be able to use Wilkinson-Rogers-like formulas to specify a mapping from model parameters to the elements of transition ($Q$) matrices. This will have several benefits:
 
 - simplifies specification of $Q$
 - allows for additive models (i.e. or more general mappings from sets of parameters to rates)
-- makes it easy to compute *contrasts* (differences in rates, or differences in differences in rates in the case of interactions)
+- parameterizes models in terms of *contrasts* (differences in rates, or differences in differences in rates in the case of interactions)
 
 In general we want to be able to specify the dependence of rates of change of one trait on the states of other traits. We should also be able to specify symmetry/directionality/asymmetry.
 
-Taking the model from Eckert et al., where we have traits `ag` (accessory glands), `pc` (parental care), `sc` (spawning mode/sperm competition). The main model used in the paper would be specified as
+Taking the example from @eckert_parental_2025, where we have traits `ag` (accessory glands), `pc` (parental care), `sc` (spawning mode/sperm competition). The main model used in the paper would be specified as
 
 ```{r ex1}
 list(ag ~ pc*sc, pc ~ 1, sc ~ 1)
@@ -27,16 +28,16 @@ The `ARD` (all rates different) specification in `corHMM` would be specified as
 list(ag ~ pc*sc, pc ~ ag*sc, sc ~ ag*pc)
 ```
 
-When we call `model.matrix()` to generate design matrices that map optimization parameters to rates of loss/gain according to these rules, the optimization parameters will automatically be expressed in terms of contrasts, e.g. for `ag ~ pc*sc` the parameters (for, e.g., gain of accessory glands: loss rates will be parallel) are
+When we call `model.matrix()` to generate design matrices that map optimization parameters to rates of loss/gain according to these rules, the optimization parameters will automatically be expressed in terms of contrasts, e.g. with default *treatment contrasts*, for `ag ~ pc*sc` the parameters (for, e.g., gain of accessory glands: loss rates will be parallel) are
 
 * intercept: log-hazard of gain when pc=0, sc=0
 * pc effect: difference between log-hazard of gain between (pc=0,sc=0) and (pc=1,sc=0)
 * sc effect: ditto, (pc=0,sc=0) vs (pc=0,sc=1)
 * interaction: (pc1,sc1)-(pc1,sc0)-(pc0,sc1)+(pc0,sc0)
 
-We can see this in action:
+We can see this in action.
 
-```{r}
+```{r proc, echo=FALSE}
 mkmat <- function(form, data, ...) {
   X <- model.matrix(form, data = data, ...)
   nm <- lapply(names(data), \(nm) sprintf("%s=%s", nm, data[[nm]])) |>
@@ -49,21 +50,32 @@ pfun <- function(p) {
   print(p)
   invisible(NULL)
 }
+```
+
+The design matrix:
+```{r proc2}
 m <- expand.grid(sc=factor(0:1), pc=factor(0:1))
 pfun(X <- mkmat(~sc*pc, m))
+```
+
+
+The inverse (definining the parameters as functions of the log-hazard rates):
+```{r proc2-inv}
 solve(X)
 ```
 
-Or
+*Sum-to-zero* contrasts make the main effects more interpretable (they now become the *average* difference in log-hazard loss/gain rates across other states).
 
-```{r}
+```{r proc3}
 pfun(X <- mkmat(~sc*pc, m, contrasts = list(sc = contr.sum, pc = contr.sum)))
 MASS::fractions(solve(X))
 ```
 
 Haoyu has implemented this machinery (not within `corHMM` but within a separate repo [here](https://github.com/Haoyu-Alan-Ji/pruning)). It does handle this case, here are the things it *doesn't* handle yet:
 
-* **symmetry**: there should (?) be a way to specify that the gain/loss rates of a particular trait are symmetric, e.g. `ag ~ symm(pc*sc)`. This seems fussy but not terribly hard to implement.
+* **symmetry**: there should (?) be a way to specify that the gain/loss rates of a particular trait are symmetric, e.g. `ag ~ symm(pc*sc)`. This seems fussy but not terribly hard to implement. (In progress.)
 * **directed transitions**: do we need to be able to specify that some transitions are forbidden, e.g. loss-only or gain-only traits? (Seems of limited utility; more detailed hypotheses about forbidden transitions, e.g. "gain of A is only possible when B=1 and C=1" probably still need to be coded manually?)
 * **extensions to the covarion model**: it's not clear (a) whether our current machinery would work properly for covarion models with >1 blocks, or (b) whether one would want more fine-grained control of how traits varied within and among covarion blocks
+* **different formulas for gain/loss**: at present we assume that the parameter structure is in the same in both directions (gain/loss), even though the parameters are not (by default). Do we want to allow different formulas for gain/loss, e.g. `ag~list(gain=~pc*sc, loss=~1)` (what is a good, non-clunky syntax for this?)
 
+## References

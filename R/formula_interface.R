@@ -1,45 +1,77 @@
+edge_table <- function(traitM, trait_names) {
+  ns <- nrow(traitM)
+  Xstate <- as.matrix(traitM[trait_names])
+  
+  idx_grid <- expand.grid(to = seq_len(ns), from = seq_len(ns))
+  idx_grid <- idx_grid[idx_grid$from != idx_grid$to, ]
+  
+  diff_matrix <- Xstate[idx_grid$to, ] - Xstate[idx_grid$from, ]
+  diff_count <- rowSums(diff_matrix != 0)
+  
+  valid_idx <- which(diff_count == 1L)
+  edges <- idx_grid[valid_idx, ]
+  final_diffs <- diff_matrix[valid_idx, ]
+  
+  change_col_idx <- max.col(final_diffs != 0)
+  
+  res <- data.frame(edge_id = seq_along(valid_idx),
+                    from = edges$from, to = edges$to,
+                    from_label = traitM$label[edges$from], to_label = traitM$label[edges$to],
+                    changed_trait = trait_names[change_col_idx],
+                    delta = final_diffs[cbind(seq_along(change_col_idx), change_col_idx)]
+                    )
+  
+  res$direction <- ifelse(res$delta > 0, "gain", "loss")
+  res$focal_from <- Xstate[cbind(edges$from, change_col_idx)]
+  res$focal_to   <- Xstate[cbind(edges$to, change_col_idx)]
+  res <- cbind(res, traitM[edges$from, trait_names])
+  
+  return(res)
+}
+
+#' take a list of two-sided formulas. Check whether they contain sym() on the LHS;
+#' if so, set `is_sym` to TRUE and remove sym()
+#' @return a list containing `formula_list` (processed formula list) and `is_sym` (whether each term
+#' contains `sym()`
+#' @examples
+#' get_sym(list(A~sym(a+b*c), B~sym(1), C~a+b))
+get_sym <- function(formula_list) {
+  is_sym <- rep(FALSE, length(formula_list))
+  for (i in seq_along(formula_list)) {
+    f <- formula_list[[i]]
+    if (identical(f[[3]][[1]], quote(sym))) {
+      is_sym[i] <- TRUE
+      f[[3]] <- f[[3]][[2]] ## drop
+      formula_list[[i]] <- f
+    }
+  }
+  return(list(formula_list = formula_list, is_sym = is_sym))
+}
+
 #' @examples
 #' formula_test <- translate(list(ag ~ pc * sc, pc ~ 1, sc ~ 1))
+#' formula_test2 <- translate(list(ag ~ sym(pc * sc), pc ~ 1, sc ~ 1))
 translate <- function(formula_list, nstate = 2) {
-  trait_names <- vapply(formula_list, \(f) as.character(f[[2]]), character(1))
-  names(formula_list) <- trait_names
 
+  ## process formula list to get symmetry info
+  ff <- get_sym(formula_list)
+  is_sym <- ff$is_sym
+  formula_list <- ff$formula_list
+  
+  trait_names <- vapply(formula_list, \(f) as.character(f[[2]]), character(1))
+  names(formula_list) <- names(is_sym) <- trait_names
+
+  
+  ## if symmetric, has one direction been processed?
+  sym_done <- rep(FALSE, length(trait_names))
+  names(sym_done) <- trait_names
+  
   stateList <- rep.int(as.integer(nstate), length(trait_names))
   names(stateList) <- trait_names
 
   traitMatrix <- do.call(expand.grid, lapply(stateList, function(x) 0:(x - 1)))
   traitMatrix$label <- do.call(paste, c(traitMatrix, sep = "|"))
 
-  edge_table <- function(traitM, trait_names) {
-    ns <- nrow(traitM)
-    Xstate <- as.matrix(traitM[trait_names])
-    
-    idx_grid <- expand.grid(to = seq_len(ns), from = seq_len(ns))
-    idx_grid <- idx_grid[idx_grid$from != idx_grid$to, ]
-    
-    diff_matrix <- Xstate[idx_grid$to, ] - Xstate[idx_grid$from, ]
-    diff_count <- rowSums(diff_matrix != 0)
-    
-    valid_idx <- which(diff_count == 1L)
-    edges <- idx_grid[valid_idx, ]
-    final_diffs <- diff_matrix[valid_idx, ]
-    
-    change_col_idx <- max.col(final_diffs != 0)
-    
-    res <- data.frame(edge_id = seq_along(valid_idx),
-                      from = edges$from, to = edges$to,
-                      from_label = traitM$label[edges$from], to_label = traitM$label[edges$to],
-                      changed_trait = trait_names[change_col_idx],
-                      delta = final_diffs[cbind(seq_along(change_col_idx), change_col_idx)]
-                      )
-    
-    res$direction <- ifelse(res$delta > 0, "gain", "loss")
-    res$focal_from <- Xstate[cbind(edges$from, change_col_idx)]
-    res$focal_to   <- Xstate[cbind(edges$to, change_col_idx)]
-    res <- cbind(res, traitM[edges$from, trait_names])
-    
-    return(res)
-  }
   edge_tab <- edge_table(traitMatrix, trait_names)
   edge_tab <- edge_tab[order(edge_tab$to, edge_tab$from), ]
   edge_tab$edge_id <- seq_len(nrow(edge_tab))
@@ -50,6 +82,7 @@ translate <- function(formula_list, nstate = 2) {
   edge_groups <- split(edge_tab, list(edge_tab$changed_trait, edge_tab$direction))
   edge_groups <- edge_groups[sort(names(edge_groups))]
 
+  last_block <- NULL
   for (group_name in names(edge_groups)) {
     dat <- edge_groups[[group_name]]
     if (nrow(dat) == 0) next
@@ -59,12 +92,26 @@ translate <- function(formula_list, nstate = 2) {
     
     curr_formula <- formula_list[[tr]]
     rhs_terms <- delete.response(terms(curr_formula))
-    
+
     X <- model.matrix(rhs_terms, data = dat)
     n_col <- ncol(X)
     
     block_name <- paste(tr, dir, sep = "_")
-    par_index <- seq(par_counter, length.out = n_col)
+
+    ## if sym *and* second block for this trait, set par index same as previous;
+    ## don't advance par_counter
+    if (!sym_done[[tr]]) {
+      par_index <- seq(par_counter, length.out = n_col)
+      par_counter <- par_counter + n_col
+      if (is_sym[[tr]]) sym_done[[tr]] <- TRUE
+      last_block <- block_name
+    } else {
+      if (is_sym[[tr]] && sym_done[[tr]]) {
+        browser()
+        ## untested!
+        par_index <- blocks[[last_block]]$par_index
+      }
+    }
     coef_names <- paste0(block_name, ":", colnames(X))
 
     blocks[[block_name]] <- list(block_name = block_name, trait = tr, direction = dir,
@@ -73,7 +120,7 @@ translate <- function(formula_list, nstate = 2) {
                                   from_label = dat$from_label, to_label   = dat$to_label,
                                   X = X, n_par = n_col, coef_names = coef_names, par_index = par_index
                                 )
-    par_counter <- par_counter + n_col
+
   }
 
   ns <- nrow(traitMatrix)
@@ -81,13 +128,21 @@ translate <- function(formula_list, nstate = 2) {
   Q_indicator[as.matrix(edge_tab[, c("from", "to")])] <- edge_tab$edge_id
   rownames(Q_indicator) <- colnames(Q_indicator) <- traitMatrix$label
 
-  Q0_sparse <- Matrix(0, ns, ns, sparse = TRUE, dimnames = list(traitMatrix$label, traitMatrix$label))
+  Q0_sparse <- Matrix::Matrix(0, ns, ns, sparse = TRUE, dimnames = list(traitMatrix$label, traitMatrix$label))
   #Q0 <- matrix(0, ns, ns, dimnames = list(traitMatrix$label, traitMatrix$label))
   #Q0 <- RTMB::AD(Q0)  ## convert base-R to RTMB/AD type
 
-  list(trait_names = trait_names, stateList = stateList, formulas = formula_list, traitMatrix = traitMatrix,
-    edge_table = edge_tab, blocks = blocks, Q_indicator = Q_indicator, Q0 = Q0_sparse,
-    n_par = par_counter - 1L, par_names = unlist(lapply(blocks, `[[`, "coef_names"), use.names = FALSE), par_index = lapply(blocks, `[[`, "par_index")
+  list(trait_names = trait_names,
+       stateList = stateList,
+       formulas = formula_list,
+       traitMatrix = traitMatrix,
+       edge_table = edge_tab,
+       blocks = blocks,
+       Q_indicator = Q_indicator,
+       Q0 = Q0_sparse,
+       n_par = par_counter - 1L,
+       par_names = unlist(lapply(blocks, `[[`, "coef_names"), use.names = FALSE),
+       par_index = lapply(blocks, `[[`, "par_index")
   )
 }
 
