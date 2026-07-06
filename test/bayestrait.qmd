@@ -1,0 +1,64 @@
+---
+title: "RTMB/corHMM comparisons on rayfinned fish data"
+author: "Haoyu Ji"
+format: 
+  html:
+    self-contained: true
+    code-fold: true
+    code-summary: "Code"
+date: today
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(here)
+```
+
+```{r pkgs}
+library(Matrix)
+library(ape)
+library(tidyverse); theme_set(theme_bw())
+library(expm)
+library(RTMB)
+library(colorspace)
+
+source(here::here("R", "postAD.R"))
+source(here::here("R", "gen2.R"))
+source(here::here("R", "post2.R"))
+```
+
+```{r datareveal}
+c_tree <- readRDS(here::here("data", "c_tree.rds"))
+c_traits <- readRDS(here::here("data", "c_traits.rds"))
+```
+
+```{r fit0}
+fit_formula <- postAD(tree = c_tree, traitMatrix = c_traits, formula_list = list(ag ~ care * spawning, care ~ 1, spawning ~ 1))
+```
+
+```{r}
+m2 <- postMCMC_tmbstan(
+  tree = c_tree,
+  traitMatrix = c_traits,
+  formula_list = list(
+    ag ~ pc * sc,
+    pc ~ 1,
+    sc ~ 1
+  ),
+  state = 2,
+  iter_warmup = 100,
+  iter_sampling = 500,
+  chains = 2,
+  gainloss = 0,
+  seed = 427
+)
+
+print(m2$fit)
+
+data.frame(
+  index = seq_along(m2$par_names),
+  par_name = m2$par_names
+)
+```
+
+

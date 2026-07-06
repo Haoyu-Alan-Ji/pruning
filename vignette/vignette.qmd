@@ -41,7 +41,7 @@ library(RTMB)
 library(colorspace)
 
 source(here::here("R", "postAD.R"))
-source(here::here("R", "general.R"))
+source(here::here("R", "gen2.R"))
 ```
 
 **FIXME**
@@ -128,6 +128,18 @@ A basic `postAD` fit only requires a tree, a trait matrix, and the number of sta
 
 ```{r fit0}
 fit0 <- postAD(tree = c_tree, traitMatrix = c_traits, state = 2)
+```
+
+```{r}
+ff0 <- postAD(
+  tree = c_tree,
+  traitMatrix = c_traits,
+  state = 2,
+  return_obj = TRUE
+)
+
+ff0$fn(ff0$par)
+ff0$gr(ff0$par)
 ```
 
 Printing the object should display a compact summary of the fitted model:
