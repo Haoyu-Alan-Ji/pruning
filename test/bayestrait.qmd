@@ -37,6 +37,7 @@ fit_formula <- postAD(tree = c_tree, traitMatrix = c_traits, formula_list = list
 ```
 
 ```{r}
+## debug(postMCMC_tmbstan)
 m2 <- postMCMC_tmbstan(
   tree = c_tree,
   traitMatrix = c_traits,
@@ -59,6 +60,8 @@ data.frame(
   index = seq_along(m2$par_names),
   par_name = m2$par_names
 )
+
+saveRDS(m2, file = "postMCMC_tmbstan.rds")
 ```
 
 

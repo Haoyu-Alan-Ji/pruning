@@ -73,7 +73,8 @@ postMCMC_tmbstan <- function(tree, traitMatrix, formula_list = NULL,
                              ub_gainloss = log(1e3),
                              range_gainloss = 3,
                              adapt_delta = 0.9,
-                             max_treedepth = 12) {
+                             max_treedepth = 12,
+                             optimize_first = TRUE) {
 
   mode <- if (is.null(formula_list)) "rates" else "formula"
 
@@ -130,12 +131,18 @@ postMCMC_tmbstan <- function(tree, traitMatrix, formula_list = NULL,
     silent = TRUE
   )
 
+  if (optimize_first) {
+      with(obj, nlminb(par, fn, gr))
+      cat("fitted pars:\n")
+      print(obj$env$last.par.best)
+  }
   fit <- tmbstan::tmbstan(
     obj,
     chains = chains,
     iter = iter_warmup + iter_sampling,
     warmup = iter_warmup,
     seed = seed,
+    init = if (optimize_first) "last.par.best" else "0",
     control = list(
       adapt_delta = adapt_delta,
       max_treedepth = max_treedepth
